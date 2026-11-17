@@ -195,6 +195,9 @@ pre.copy{max-height:260px;overflow:auto;background:var(--surface-2);padding:8px;
         <select id="f-origin" aria-label="origin"></select>
       </div>
       <div class="row">
+        <select id="f-country" aria-label="country"></select>
+      </div>
+      <div class="row">
         <select id="f-sort" aria-label="sort"></select>
         <button class="btn pri" id="btn-new" data-i18n="newLake">+ Озеро</button>
       </div>
@@ -258,7 +261,7 @@ const I18N = {
  search:["Поиск по названию, району, коду","Ad, rayon, kod üzrə axtarış"], newLake:["+ Озеро","+ Göl"],
  import:["Импорт контуров","Kontur idxalı"], measure:["Измерить","Ölçmə"], exportAll:["Экспорт","İxrac"], fitAll:["Все озёра","Bütün göllər"],
  tPass:["Паспорт","Pasport"], tMorph:["Морфометрия","Morfometriya"], tObs:["Мониторинг","Monitorinq"], tPhoto:["Фото","Foto"], tExp:["Экспорт","İxrac"],
- allRegions:["Все экономические районы","Bütün iqtisadi rayonlar"], allOrigins:["Любой генезис","İstənilən mənşə"],
+ allRegions:["Все регионы","Bütün regionlar"], allOrigins:["Любой генезис","İstənilən mənşə"],
  sortName:["По названию","Ada görə"], sortArea:["По площади","Sahəyə görə"], sortFill:["По заполненности","Doldurulmaya görə"], sortUpd:["Недавно изменённые","Son dəyişənlər"],
  dbLoad:["Подключение…","Qoşulur…"],
  noLakes:["В каталоге пока нет озёр. Добавьте озеро кнопкой «+ Озеро» или импортируйте контуры (GeoJSON, Shapefile .zip, KML, CSV).","Kataloqda hələ göl yoxdur. «+ Göl» düyməsi ilə əlavə edin və ya konturları idxal edin (GeoJSON, Shapefile .zip, KML, CSV)."],
@@ -307,7 +310,7 @@ const I18N = {
  signOut:["Выйти","Çıxış"], changePass:["Пароль","Şifrə"], members:["Сотрудники","Əməkdaşlar"],
  membersNote:["Войти в портал может только тот, кто есть в этом списке. Добавьте e-mail коллеги, затем пусть он откроет портал и выберет «Первый вход».","Portala yalnız bu siyahıda olanlar daxil ola bilər. Həmkarın e-poçtunu əlavə edin, sonra o, portalı açıb «İlk giriş» seçsin."],
  fullName:["ФИО","Soyad, ad"], role:["Роль","Rol"], addMember:["Добавить","Əlavə et"],
- expPrint:["Печать / PDF","Çap / PDF"], km2:["км²","km²"], km:["км","km"], m:["м","m"],
+ expPrint:["Печать / PDF","Çap / PDF"], allCountries:["Все страны","Bütün ölkələr"], impCountryAll:["Страна для всех импортируемых озёр","İdxal edilən bütün göllər üçün ölkə"], otherCountry:["Это озеро другой страны: его могут менять только её сотрудники","Bu göl başqa ölkəyə aiddir: onu yalnız həmin ölkənin əməkdaşları dəyişə bilər"], km2:["км²","km²"], km:["км","km"], m:["м","m"],
 };
 let lang = 'ru';
 try{ lang = localStorage.getItem('lakes-lang') || 'ru'; }catch(e){}
@@ -316,7 +319,7 @@ const I18N_EN = {
  catalog:"Catalogue", sLakes:"lakes", sArea:"area, km²", sGeom:"with outline", sFill:"completed",
  search:"Search by name, district, code", newLake:"+ Lake", import:"Import outlines", measure:"Measure", exportAll:"Export", fitAll:"All lakes",
  tPass:"Passport", tMorph:"Morphometry", tObs:"Monitoring", tPhoto:"Photos", tExp:"Export",
- allRegions:"All economic regions", allOrigins:"Any origin", sortName:"By name", sortArea:"By area", sortFill:"By completeness", sortUpd:"Recently changed",
+ allRegions:"All regions", allOrigins:"Any origin", sortName:"By name", sortArea:"By area", sortFill:"By completeness", sortUpd:"Recently changed",
  dbLoad:"Connecting…",
  noLakes:"No lakes in the catalogue yet. Add one with “+ Lake” or import outlines (GeoJSON, zipped Shapefile, KML, CSV).",
  noMatch:"Nothing matches the filters.",
@@ -359,15 +362,15 @@ const I18N_EN = {
  signOut:"Sign out", changePass:"Password", members:"Staff",
  membersNote:"Only people on this list can sign in. Add a colleague’s e-mail, then ask them to open the portal and choose “First sign-in”.",
  fullName:"Full name", role:"Role", addMember:"Add", expPrint:"Print / PDF", km2:"km²", km:"km", m:"m",
- impRegionAll:"Economic region for all (if not in attributes)",
+ impRegionAll:"Region for all (if not in attributes)", allCountries:"All countries", impCountryAll:"Country for all imported lakes", otherCountry:"This lake belongs to another country: only its staff can edit it",
 };
-const EN_FIELDS = { name:"Name", name_ru:"Name (Russian)", code:"Inventory number", region:"Economic region", district:"Administrative district",
+const EN_FIELDS = { name:"Name", name_ru:"Name (Russian)", code:"Inventory number", country:"Country", region:"Economic / admin. region", district:"Administrative district",
  lat:"Latitude, °", lon:"Longitude, °", alt:"Water surface elevation, m a.s.l.", area:"Water surface area, km²", shore:"Shoreline length, km",
  length:"Lake length, km", width:"Max. width, km", max_depth:"Max. depth, m", mean_depth:"Mean depth, m", volume:"Water volume, million m³",
  catchment:"Catchment area, km²", origin:"Basin origin", regime:"Water exchange", feeding:"Water supply type", salinity:"Salinity class",
  mineral:"Mineralization, g/L", status:"Ecological status", protect:"Protected area", uses:"Use", threats:"Threats and pressures",
  sources:"Sources, literature", notes:"Notes" };
-const EN_OPTS = { tectonic:"Tectonic", glacial:"Glacial (cirque)", dammed:"Landslide-dammed", karst:"Karst", volcanic:"Volcanic / mud volcano",
+const EN_OPTS = { AZ:"Azerbaijan", GE:"Georgia", AM:"Armenia", tectonic:"Tectonic", glacial:"Glacial (cirque)", dammed:"Landslide-dammed", karst:"Karst", volcanic:"Volcanic / mud volcano",
  lagoon:"Lagoon (Caspian relict)", floodplain:"Floodplain / oxbow", aeolian:"Deflation", artificial:"Artificial (reservoir, pond)", other:"Other",
  open:"Open (drained)", closed:"Closed (endorheic)", seasonal:"Seasonally drying",
  rain:"Rain", snow:"Snow / glacier", ground:"Groundwater", river:"River", mixed:"Mixed", anthrop:"Wastewater discharge",
@@ -380,6 +383,7 @@ const fl = f => lang==='ru' ? f[1] : lang==='en' ? (EN_FIELDS[f[0]] || f[1]) : f
 
 /* ---------- reference lists ---------- */
 const REGIONS = ["Bakı","Abşeron-Xızı","Dağlıq Şirvan","Gəncə-Daşkəsən","Qarabağ","Qazax-Tovuz","Quba-Xaçmaz","Lənkəran-Astara","Mərkəzi Aran","Mil-Muğan","Naxçıvan","Şəki-Zaqatala","Şərqi Zəngəzur","Şirvan-Salyan"];
+const COUNTRY = [["AZ","Азербайджан","Azərbaycan"],["GE","Грузия","Gürcüstan"],["AM","Армения","Ermənistan"]];
 const ORIGINS = [["tectonic","Тектоническое","Tektonik"],["glacial","Ледниковое (каровое)","Buzlaq (kar)"],["dammed","Завальное (подпрудное)","Uçqun-bənd"],["karst","Карстовое","Karst"],["volcanic","Вулканическое / грязевулк.","Vulkanik / palçıq vulkanı"],["lagoon","Лагунное (реликт Каспия)","Laqun (Xəzər reliktı)"],["floodplain","Пойменное / старица","Çaybasar / köhnə məcra"],["aeolian","Дефляционное","Deflyasiya"],["artificial","Искусственное (водохр., пруд)","Süni (su anbarı, gölməçə)"],["other","Иное","Digər"]];
 const REGIME = [["open","Сточное","Axarlı"],["closed","Бессточное","Axarsız"],["seasonal","Пересыхающее","Quruyan"]];
 const FEED = [["rain","Дождевое","Yağış"],["snow","Снеговое / ледниковое","Qar / buzlaq"],["ground","Подземное","Yeraltı"],["river","Речное","Çay"],["mixed","Смешанное","Qarışıq"],["anthrop","Сбросные воды","Tullantı suları"]];
@@ -392,7 +396,8 @@ const F = [
  ["name","Название","Adı","text","id"],
  ["name_ru","Название (рус.)","Rusca adı","text","id"],
  ["code","Инвентарный номер","İnventar nömrəsi","text","id"],
- ["region","Экономический район","İqtisadi rayon","region","loc"],
+ ["country","Страна","Ölkə","sel:COUNTRY","loc"],
+ ["region","Экономический / адм. регион","İqtisadi / inzibati region","region","loc"],
  ["district","Административный район","İnzibati rayon","text","loc"],
  ["lat","Широта, °","En dairəsi, °","num","loc"],
  ["lon","Долгота, °","Uzunluq dairəsi, °","num","loc"],
@@ -417,7 +422,7 @@ const F = [
  ["sources","Источники, литература","Mənbələr, ədəbiyyat","area","src"],
  ["notes","Примечания","Qeydlər","area","src"],
 ];
-const LISTS = {ORIGINS,REGIME,FEED,SALIN,STATUS};
+const LISTS = {COUNTRY,ORIGINS,REGIME,FEED,SALIN,STATUS};
 const GROUPS = [["id","gId"],["loc","gLoc"],["morph","gMorph"],["hydro","gHydro"],["eco","gEco"],["src","gSrc"]];
 const FILL_KEYS = ["name","region","district","lat","alt","area","max_depth","mean_depth","volume","catchment","origin","regime","feeding","salinity","mineral","status"];
 
@@ -435,7 +440,8 @@ const round6 = g => Array.isArray(g) ? (typeof g[0]==="number" ? [Math.round(g[0
 
 /* ---------- Supabase ---------- */
 const COLS = F.map(f=>f[0]).concat(["attrs","geojson","demo"]);
-let sb = null, me = null, myRole = null, canWrite = false, isAdmin = false;
+let sb = null, me = null, myRole = null, myCountry = null, canWrite = false, isAdmin = false;
+const canEditLake = l => !!l && (isAdmin || (canWrite && (l.country||"AZ") === myCountry));
 const lakes = new Map();          // id -> row (+ hasGeom)
 const geoms = new Map();          // id -> {geometry}
 let selId = null, tab = "pass", editing = false;
@@ -521,16 +527,19 @@ document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if(mode){ endMod
 
 /* ---------- catalog list ---------- */
 function fillSelects(){
-  const r=$("#f-region"), o=$("#f-origin"), s=$("#f-sort");
-  const rv=r.value, ov=o.value, sv=s.value||"name";
-  r.innerHTML = `<option value="">${esc(t("allRegions"))}</option>` + REGIONS.map(x=>`<option>${esc(x)}</option>`).join("");
+  const r=$("#f-region"), o=$("#f-origin"), s=$("#f-sort"), c=$("#f-country");
+  const rv=r.value, ov=o.value, sv=s.value||"name", cv=c.value;
+  c.innerHTML = `<option value="">${esc(t("allCountries"))}</option>` + COUNTRY.map(x=>`<option value="${x[0]}">${esc(lbl(x))}</option>`).join(""); c.value=cv;
+  const regs = [...new Set([...REGIONS, ...[...lakes.values()].map(l=>l.region).filter(Boolean)])].sort((a,b)=>a.localeCompare(b));
+  r.innerHTML = `<option value="">${esc(t("allRegions"))}</option>` + regs.map(x=>`<option>${esc(x)}</option>`).join("");
   o.innerHTML = `<option value="">${esc(t("allOrigins"))}</option>` + ORIGINS.map(x=>`<option value="${x[0]}">${esc(lbl(x))}</option>`).join("");
   s.innerHTML = [["name","sortName"],["area","sortArea"],["fill","sortFill"],["upd","sortUpd"]].map(x=>`<option value="${x[0]}">${esc(t(x[1]))}</option>`).join("");
   r.value=rv; o.value=ov; s.value=sv;
 }
 function filtered(){
-  const q = $("#q").value.trim().toLowerCase(), rg=$("#f-region").value, og=$("#f-origin").value;
+  const q = $("#q").value.trim().toLowerCase(), rg=$("#f-region").value, og=$("#f-origin").value, cg=$("#f-country").value;
   let arr = [...lakes.values()].filter(l=>{
+    if(cg && (l.country||"AZ")!==cg) return false;
     if(rg && l.region!==rg) return false;
     if(og && l.origin!==og) return false;
     if(q){ const h=[l.name,l.name_ru,l.code,l.district,l.region].join(" ").toLowerCase(); if(!h.includes(q)) return false; }
@@ -549,7 +558,7 @@ function renderList(){
     return `<div class="item${l.id===selId?" sel":""}" data-id="${esc(l.id)}" tabindex="0" role="button">
       <div class="nm">${esc(l.name||t("newName"))} ${l.demo?`<span class="chip demo">${esc(t("demo"))}</span>`:""}</div>
       <div class="ar">${l.area!==undefined&&l.area!==""&&l.area!==null?`<b>${num(l.area,3)}</b>${t("km2")}`:""}</div>
-      <div class="meta">${esc([l.region,l.district].filter(Boolean).join(" · ")||"—")}${st?` · <span class="chip ${st[3]}">${esc(lbl(st))}</span>`:""}</div>
+      <div class="meta"><span class="chip">${esc(l.country||"AZ")}</span> ${esc([l.region,l.district].filter(Boolean).join(" · ")||"—")}${st?` · <span class="chip ${st[3]}">${esc(lbl(st))}</span>`:""}</div>
       <div class="bar" title="${esc(t("completeness"))}: ${c}%"><i style="width:${c}%"></i></div>
     </div>`;
   }).join("");
@@ -563,7 +572,7 @@ function renderList(){
 }
 $("#list").addEventListener("click", e=>{ const it=e.target.closest(".item"); if(it){ select(it.dataset.id, true); if(innerWidth<=820) $("#rail").classList.remove("open"); } });
 $("#list").addEventListener("keydown", e=>{ if(e.key==="Enter"){ const it=e.target.closest(".item"); if(it) select(it.dataset.id,true); } });
-["#q","#f-region","#f-origin","#f-sort"].forEach(s=>$(s).addEventListener("input", ()=>{ renderList(); renderLayer(); }));
+["#q","#f-region","#f-origin","#f-sort","#f-country"].forEach(s=>$(s).addEventListener("input", ()=>{ renderList(); renderLayer(); }));
 $("#railToggle").onclick = ()=>$("#rail").classList.toggle("open");
 $("#btn-fit").onclick = ()=>fitAll();
 function fitAll(){ const fg=L.featureGroup([...markers.values()]); if(fg.getLayers().length) map.fitBounds(fg.getBounds().pad(0.15),{maxZoom:11}); else map.setView([40.3,47.7],7); }
@@ -643,15 +652,15 @@ function passView(l){
   if(l.attrs && Object.keys(l.attrs).length){
     h += `<div class="sec"><h3>${esc(t("gAttrs"))}</h3><dl class="kv">` + Object.entries(l.attrs).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("") + `</dl></div>`;
   }
-  h += `<div class="actions">${canWrite?`<button class="btn pri" data-act="edit">${esc(t("edit"))}</button><button class="btn" data-act="pick">${esc(t("pickPoint"))}</button><button class="btn" data-act="geom">${esc(t("replaceGeom"))}</button><button class="btn danger" data-act="del">${esc(t("del"))}</button>`:`<span class="note">${esc(t("readOnly"))}</span>`}</div>`;
+  h += `<div class="actions">${canEditLake(l)?`<button class="btn pri" data-act="edit">${esc(t("edit"))}</button><button class="btn" data-act="pick">${esc(t("pickPoint"))}</button><button class="btn" data-act="geom">${esc(t("replaceGeom"))}</button><button class="btn danger" data-act="del">${esc(t("del"))}</button>`:`<span class="note">${esc(canWrite?t("otherCountry"):t("readOnly"))}</span>`}</div>`;
   return h;
 }
 function input(f, v){
   const [k,ru,az,type]=f, id="fld-"+k, lab=esc(fl(f));
   v = v ?? "";
   if(type==="area") return `<label class="full" for="${id}">${lab}<textarea id="${id}" name="${k}">${esc(v)}</textarea></label>`;
-  if(type==="region") return `<label for="${id}">${lab}<select id="${id}" name="${k}"><option value="">—</option>${REGIONS.map(r=>`<option${r===v?" selected":""}>${esc(r)}</option>`).join("")}</select></label>`;
-  if(type.startsWith("sel:")){ const list=LISTS[type.slice(4)]; return `<label for="${id}">${lab}<select id="${id}" name="${k}"><option value="">—</option>${list.map(o=>`<option value="${o[0]}"${o[0]===v?" selected":""}>${esc(lbl(o))}</option>`).join("")}</select></label>`; }
+  if(type==="region") return `<label for="${id}">${lab}<input type="text" list="dl-regions" id="${id}" name="${k}" value="${esc(v)}"><datalist id="dl-regions">${REGIONS.map(r=>`<option value="${esc(r)}"></option>`).join("")}</datalist></label>`;
+  if(type.startsWith("sel:")){ const list=LISTS[type.slice(4)]; return `<label for="${id}">${lab}<select id="${id}" name="${k}"${k==="country"&&!isAdmin?" disabled":""}><option value="">—</option>${list.map(o=>`<option value="${o[0]}"${o[0]===v?" selected":""}>${esc(lbl(o))}</option>`).join("")}</select></label>`; }
   if(type==="num") return `<label for="${id}">${lab}<input type="number" step="any" id="${id}" name="${k}" value="${esc(v)}"></label>`;
   return `<label for="${id}"${k==="name"?' class="full"':""}>${lab}<input type="text" id="${id}" name="${k}" value="${esc(v)}"></label>`;
 }
@@ -675,7 +684,7 @@ function morphCalc(id){
 }
 function morphView(l){
   const m = morphCalc(l.id);
-  if(!m) return `<p class="note">${esc(t("noGeom"))}</p>${canWrite?`<div class="actions"><button class="btn pri" data-act="geom">${esc(t("replaceGeom"))}</button></div>`:""}`;
+  if(!m) return `<p class="note">${esc(t("noGeom"))}</p>${canEditLake(l)?`<div class="actions"><button class="btn pri" data-act="geom">${esc(t("replaceGeom"))}</button></div>`:""}`;
   return `<div class="sec"><dl class="kv">
     <dt>${esc(t("mArea"))}</dt><dd><b>${num(m.A,4)}</b> ${t("km2")}</dd>
     <dt>${esc(t("mPer"))}</dt><dd>${num(m.P,3)} ${t("km")}</dd>
@@ -684,7 +693,7 @@ function morphView(l){
     <dt>${esc(t("mCen"))}</dt><dd>${m.c[1].toFixed(5)}° N, ${m.c[0].toFixed(5)}° E</dd>
     <dt>${esc(t("mParts"))}</dt><dd>${m.parts}</dd>
   </dl></div><p class="note">${esc(t("mFrom"))}</p>
-  ${canWrite?`<div class="actions"><button class="btn pri" data-act="tomorph">${esc(t("toPass"))}</button><button class="btn" data-act="geom">${esc(t("replaceGeom"))}</button></div>`:""}`;
+  ${canEditLake(l)?`<div class="actions"><button class="btn pri" data-act="tomorph">${esc(t("toPass"))}</button><button class="btn" data-act="geom">${esc(t("replaceGeom"))}</button></div>`:""}`;
 }
 let chartParam = "level";
 function chartSVG(rows, key){
@@ -709,8 +718,8 @@ function obsView(l){
   let h = `<div class="sec"><div class="row" style="margin-bottom:8px"><label for="cparam" class="note" style="flex:none">${esc(t("param"))}</label><select id="cparam">${OBS.map(o=>`<option value="${o[0]}"${o[0]===chartParam?" selected":""}>${esc(t(o[1]))}</option>`).join("")}</select></div>${chartSVG(obsRows, chartParam)}</div>`;
   if(!obsRows.length) h += `<p class="note">${esc(t("noObs"))}</p>`;
   else h += `<div class="sec tw"><table class="t"><thead><tr><th>${esc(t("date"))}</th>${OBS.map(o=>`<th>${esc(t(o[1]))}</th>`).join("")}<th>${esc(t("source"))}</th><th></th></tr></thead><tbody>${
-    [...obsRows].reverse().map(r=>`<tr><td>${esc(r.date)}</td>${OBS.map(o=>`<td>${num(r[o[0]],3)}</td>`).join("")}<td style="text-align:left">${esc(r.source||"")}${r.note?` <span class="note" title="${esc(r.note)}">ⓘ</span>`:""}</td><td>${canWrite?`<button class="btn ghost sm" data-delobs="${esc(r.id)}" aria-label="delete">✕</button>`:""}</td></tr>`).join("")}</tbody></table></div>`;
-  if(canWrite) h += `<div class="sec"><h3>${esc(t("addObs"))}</h3><form id="oform" class="form">
+    [...obsRows].reverse().map(r=>`<tr><td>${esc(r.date)}</td>${OBS.map(o=>`<td>${num(r[o[0]],3)}</td>`).join("")}<td style="text-align:left">${esc(r.source||"")}${r.note?` <span class="note" title="${esc(r.note)}">ⓘ</span>`:""}</td><td>${canEditLake(l)?`<button class="btn ghost sm" data-delobs="${esc(r.id)}" aria-label="delete">✕</button>`:""}</td></tr>`).join("")}</tbody></table></div>`;
+  if(canEditLake(l)) h += `<div class="sec"><h3>${esc(t("addObs"))}</h3><form id="oform" class="form">
     <label for="o-date">${esc(t("date"))}<input type="date" id="o-date" name="date" required value="${new Date().toISOString().slice(0,10)}"></label>
     ${OBS.map(o=>`<label for="o-${o[0]}">${esc(t(o[1]))}<input type="number" step="any" id="o-${o[0]}" name="${o[0]}"></label>`).join("")}
     <label for="o-source">${esc(t("source"))}<input type="text" id="o-source" name="source" placeholder="Sentinel-2, polevoe…"></label>
@@ -719,8 +728,8 @@ function obsView(l){
   return h;
 }
 function photoView(l){
-  let h = photoRows.length ? `<div class="photos">${photoRows.map(p=>`<figure><img src="${esc(p.data)}" alt="${esc(p.caption||l.name)}" data-big="${esc(p.id)}">${canWrite?`<button class="x" data-delph="${esc(p.id)}" aria-label="delete">✕</button>`:""}<figcaption>${esc(p.caption||"")} ${p.at?`· ${fmtDate(p.at)}`:""}</figcaption></figure>`).join("")}</div>` : `<p class="note">${esc(t("noPhoto"))}</p>`;
-  if(canWrite) h += `<div class="actions"><input type="text" id="ph-cap" placeholder="${esc(t("caption"))}" style="flex:1"><button class="btn pri" data-act="photo">${esc(t("addPhoto"))}</button></div>`;
+  let h = photoRows.length ? `<div class="photos">${photoRows.map(p=>`<figure><img src="${esc(p.data)}" alt="${esc(p.caption||l.name)}" data-big="${esc(p.id)}">${canEditLake(l)?`<button class="x" data-delph="${esc(p.id)}" aria-label="delete">✕</button>`:""}<figcaption>${esc(p.caption||"")} ${p.at?`· ${fmtDate(p.at)}`:""}</figcaption></figure>`).join("")}</div>` : `<p class="note">${esc(t("noPhoto"))}</p>`;
+  if(canEditLake(l)) h += `<div class="actions"><input type="text" id="ph-cap" placeholder="${esc(t("caption"))}" style="flex:1"><button class="btn pri" data-act="photo">${esc(t("addPhoto"))}</button></div>`;
   return h;
 }
 function expView(l){
@@ -859,7 +868,7 @@ proj4.defs("EPSG:32638","+proj=utm +zone=38 +datum=WGS84 +units=m +no_defs");
 proj4.defs("EPSG:32639","+proj=utm +zone=39 +datum=WGS84 +units=m +no_defs");
 proj4.defs("EPSG:28408","+proj=tmerc +lat_0=0 +lon_0=45 +k=1 +x_0=8500000 +y_0=0 +ellps=krass +towgs84=23.57,-140.95,-79.8,0,0.35,0.79,-0.22 +units=m +no_defs");
 proj4.defs("EPSG:28409","+proj=tmerc +lat_0=0 +lon_0=51 +k=1 +x_0=9500000 +y_0=0 +ellps=krass +towgs84=23.57,-140.95,-79.8,0,0.35,0.79,-0.22 +units=m +no_defs");
-const AUTOMAP = { name:/^(name|ad|adi|adı|gol|göl|lake|название|naz)/i, name_ru:/(name_ru|ru_name|rus)/i, code:/^(code|kod|id_?inv|inv|№|nomer)/i, region:/(region|iqt|econ)/i, district:/(district|rayon|raion)/i,
+const AUTOMAP = { country:/^(country|olke|ölkə|strana|iso)/i, name:/^(name|ad|adi|adı|gol|göl|lake|название|naz)/i, name_ru:/(name_ru|ru_name|rus)/i, code:/^(code|kod|id_?inv|inv|№|nomer)/i, region:/(region|iqt|econ)/i, district:/(district|rayon|raion)/i,
   alt:/^(alt|elev|hund|height|h_abs|высот)/i, area:/^(area|sahe|sahə|area_km|s_km|площ)/i, max_depth:/(max_?dep|dmax|h_?max|maks)/i, mean_depth:/(mean_?dep|avg_?dep|dmean|h_?mean|orta)/i, volume:/^(vol|hecm|həcm|объ)/i, mineral:/(miner|tds|salin)/i };
 function renderImport(){
   const fc=impFC, ib=$("#impBody");
@@ -879,7 +888,8 @@ function renderImport(){
     const mapF = F.filter(f=>AUTOMAP[f[0]]);
     h += `<div class="sec"><h3>${esc(t("impMap"))}</h3><div class="form">${mapF.map(f=>{ const guess = keys.find(k=>k===f[0]) || keys.find(k=>AUTOMAP[f[0]].test(k)) || "";
       return `<label for="map-${f[0]}">${esc(fl(f))}<select id="map-${f[0]}" data-map="${f[0]}"><option value="">${esc(t("impNone"))}</option>${keys.map(k=>`<option${k===guess?" selected":""}>${esc(k)}</option>`).join("")}</select></label>`; }).join("")}
-      <label class="full" for="imp-region">${esc(lang==='en'?t("impRegionAll"):lang==='ru'?"Экономический район для всех (если не в атрибутах)":"Hamısı üçün iqtisadi rayon (atributlarda yoxdursa)")}<select id="imp-region"><option value="">—</option>${REGIONS.map(r=>`<option>${esc(r)}</option>`).join("")}</select></label>
+      <label class="full" for="imp-region">${esc(lang==='en'?t("impRegionAll"):lang==='ru'?"Регион для всех (если не в атрибутах)":"Hamısı üçün region (atributlarda yoxdursa)")}<input type="text" list="dl-regions2" id="imp-region"><datalist id="dl-regions2">${REGIONS.map(r=>`<option value="${esc(r)}"></option>`).join("")}</datalist></label>
+      ${isAdmin?`<label class="full" for="imp-country">${esc(t("impCountryAll"))}<select id="imp-country">${COUNTRY.map(c=>`<option value="${c[0]}">${esc(lbl(c))}</option>`).join("")}</select></label>`:""}
       <label class="full" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="imp-auto" checked> ${esc(t("impAutoArea"))}</label></div></div>
       <div id="imp-prog"></div><div class="actions"><button class="btn pri" id="imp-go"${(!polys.length&&!pts.length)||projected?" disabled":""}>${esc(t("impGo"))} (${polys.length+pts.length})</button></div>`;
   }
@@ -899,7 +909,7 @@ async function runImport(){
     return;
   }
   const mapping = {}; document.querySelectorAll("[data-map]").forEach(s=>{ if(s.value) mapping[s.dataset.map]=s.value; });
-  const regionAll = $("#imp-region").value, auto = $("#imp-auto").checked;
+  const regionAll = $("#imp-region").value.trim(), auto = $("#imp-auto").checked, countryAll = $("#imp-country") ? $("#imp-country").value : myCountry;
   const feats = fc.features.filter(f=>/Polygon|Point/.test(f.geometry.type) && f.geometry.type!=="MultiPoint");
   const prog=$("#imp-prog"); prog.innerHTML=`<progress max="${feats.length}" value="0"></progress>`; const bar=prog.querySelector("progress");
   let n=0; const used = new Set(Object.values(mapping)); let batch=[];
@@ -910,6 +920,7 @@ async function runImport(){
     for(const fd of F){ if(m[fd[0]]===undefined && p[fd[0]]!==undefined) m[fd[0]]=fd[0]; }
     for(const [k,src] of Object.entries(m)){ let v=p[src]; if(v===undefined||v===null||v==="") continue; const fd=F.find(x=>x[0]===k); if(fd[3]==="num"){ v=+String(v).replace(",","."); if(!isFinite(v)) continue; } else v=String(v); d[k]=v; }
     if(!d.region && regionAll) d.region=regionAll;
+    if(!d.country || !COUNTRY.some(c=>c[0]===d.country)) d.country = countryAll || "AZ";
     const skipKeys = new Set([...used, ...F.map(x=>x[0]), "id","updatedAt","updated_at"]);
     const attrs={}; for(const [k,v] of Object.entries(p)){ if(!skipKeys.has(k) && v!==null && v!=="" && typeof v!=="object") attrs[k]=String(v).slice(0,300); }
     if(Object.keys(attrs).length) d.attrs=attrs;
@@ -990,7 +1001,7 @@ $("#lang-en").onclick=()=>{ lang='en'; ls.set('lakes-lang','en'); applyLang(); }
 let dbState = "load", firstFit = true;
 const SEL = ["id",...COLS,"created_at","created_by_email","updated_at","updated_by_email"].join(",");
 function setDb(s){ dbState=s; const dot=$("#dbdot"); dot.className="dot"+(s==="on"?" on":s==="off"?" off":"");
-  $("#dbstat").textContent = s==="on" ? `${me?me.email:""} · ${t("role_"+myRole)}` : s==="off"?t("dbOffline"):t("dbLoad"); }
+  $("#dbstat").textContent = s==="on" ? `${me?me.email:""} · ${t("role_"+myRole)}${myCountry?" · "+myCountry:""}` : s==="off"?t("dbOffline"):t("dbLoad"); }
 function setLake(row){ lakes.set(row.id, {...row, hasGeom:!!row.geojson}); if(row.geojson) geoms.set(row.id,{geometry:row.geojson}); else geoms.delete(row.id); }
 async function loadLakes(){
   setDb("load");
@@ -998,7 +1009,7 @@ async function loadLakes(){
     let all=[], from=0; const page=500;
     while(true){ const rows = chk(await sb.from("lakes").select(SEL).order("name").range(from, from+page-1)); all=all.concat(rows); if(rows.length<page) break; from+=page; }
     lakes.clear(); geoms.clear(); all.forEach(setLake);
-    setDb("on"); renderList(); renderLayer(); if(selId && !editing) renderDrawer();
+    setDb("on"); fillSelects(); renderList(); renderLayer(); if(selId && !editing) renderDrawer();
     if(firstFit){ firstFit=false; const h=location.hash.match(/^#lake-(.+)$/); if(h && lakes.has(h[1])) select(h[1],true); else if(lakes.size) fitAll(); }
   }catch(err){ setDb("off"); failMsg(err); }
 }
@@ -1062,8 +1073,8 @@ function afterLogin(){ return afterP || (afterP = doAfterLogin().catch(e=>{ afte
 async function doAfterLogin(){
   const { data:{ user:u } } = await sb.auth.getUser(); if(!u){ showLogin(); return; }
   me = u;
-  const r = await sb.from("lab_members").select("role").eq("email", (u.email||"").toLowerCase()).maybeSingle();
-  myRole = r.data && r.data.role;
+  const r = await sb.from("lab_members").select("role,country").eq("email", (u.email||"").toLowerCase()).maybeSingle();
+  myRole = r.data && r.data.role; myCountry = (r.data && r.data.country) || "AZ";
   if(!myRole){ afterP=null; showNoAccess(); return; }
   canWrite = myRole==="admin" || myRole==="editor"; isAdmin = myRole==="admin";
   closeGate(); $("#userbox").hidden=false; $("#btn-members").hidden=!isAdmin;
@@ -1079,15 +1090,17 @@ async function renderMembers(){
   await loadMembers();
   const roles=["admin","editor","viewer"];
   openModal(`<h3>${esc(t("members"))}</h3><p class="note">${esc(t("membersNote"))}</p>
-    <div class="tw"><table class="t"><thead><tr><th>E-mail</th><th style="text-align:left">${esc(t("fullName"))}</th><th style="text-align:left">${esc(t("role"))}</th><th></th></tr></thead><tbody>
-    ${members.map(m=>`<tr><td>${esc(m.email)}</td><td style="text-align:left">${esc(m.full_name||"")}</td><td style="text-align:left"><select data-role="${esc(m.email)}" ${m.email===me.email?"disabled":""}>${roles.map(r=>`<option value="${r}"${r===m.role?" selected":""}>${esc(t("role_"+r))}</option>`).join("")}</select></td><td>${m.email===me.email?"":`<button class="btn ghost sm" data-rm="${esc(m.email)}" aria-label="delete">✕</button>`}</td></tr>`).join("")}
+    <div class="tw"><table class="t"><thead><tr><th>E-mail</th><th style="text-align:left">${esc(t("fullName"))}</th><th style="text-align:left">${esc(t("role"))}</th><th style="text-align:left">${esc(fl(F.find(f=>f[0]==="country")))}</th><th></th></tr></thead><tbody>
+    ${members.map(m=>`<tr><td>${esc(m.email)}</td><td style="text-align:left">${esc(m.full_name||"")}</td><td style="text-align:left"><select data-role="${esc(m.email)}" ${m.email===me.email?"disabled":""}>${roles.map(r=>`<option value="${r}"${r===m.role?" selected":""}>${esc(t("role_"+r))}</option>`).join("")}</select></td><td style="text-align:left"><select data-cty="${esc(m.email)}">${COUNTRY.map(c=>`<option value="${c[0]}"${c[0]===(m.country||"AZ")?" selected":""}>${esc(lbl(c))}</option>`).join("")}</select></td><td>${m.email===me.email?"":`<button class="btn ghost sm" data-rm="${esc(m.email)}" aria-label="delete">✕</button>`}</td></tr>`).join("")}
     </tbody></table></div>
     <form id="mf" class="form" style="margin-top:12px"><label for="mf-e">E-mail<input type="email" id="mf-e" required></label><label for="mf-n">${esc(t("fullName"))}<input type="text" id="mf-n"></label>
     <label for="mf-r">${esc(t("role"))}<select id="mf-r">${roles.map(r=>`<option value="${r}"${r==="editor"?" selected":""}>${esc(t("role_"+r))}</option>`).join("")}</select></label>
+    <label for="mf-c">${esc(fl(F.find(f=>f[0]==="country")))}<select id="mf-c">${COUNTRY.map(c=>`<option value="${c[0]}">${esc(lbl(c))}</option>`).join("")}</select></label>
     <div class="actions" style="align-self:end;margin:0"><button class="btn pri" type="submit">${esc(t("addMember"))}</button></div></form>
     <div class="actions"><button class="btn" data-close>${esc(t("close"))}</button></div>`);
-  $("#mf").onsubmit=async e=>{ e.preventDefault(); try{ chk(await sb.from("lab_members").upsert({email:$("#mf-e").value.trim().toLowerCase(), full_name:$("#mf-n").value.trim()||null, role:$("#mf-r").value})); renderMembers(); toast(t("saved")); }catch(err){ failMsg(err); } };
+  $("#mf").onsubmit=async e=>{ e.preventDefault(); try{ chk(await sb.from("lab_members").upsert({email:$("#mf-e").value.trim().toLowerCase(), full_name:$("#mf-n").value.trim()||null, role:$("#mf-r").value, country:$("#mf-c").value})); renderMembers(); toast(t("saved")); }catch(err){ failMsg(err); } };
   $("#mbox").querySelectorAll("[data-role]").forEach(s=>s.onchange=async()=>{ try{ chk(await sb.from("lab_members").update({role:s.value}).eq("email", s.dataset.role)); toast(t("saved")); }catch(err){ failMsg(err); } });
+  $("#mbox").querySelectorAll("[data-cty]").forEach(s=>s.onchange=async()=>{ try{ chk(await sb.from("lab_members").update({country:s.value}).eq("email", s.dataset.cty)); toast(t("saved")); }catch(err){ failMsg(err); } });
   $("#mbox").querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{ try{ chk(await sb.from("lab_members").delete().eq("email", b.dataset.rm)); renderMembers(); }catch(err){ failMsg(err); } });
 }
 
