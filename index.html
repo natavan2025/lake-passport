@@ -36,7 +36,7 @@ body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--f-body);display:
 button,input,select,textarea{font:inherit;color:inherit}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-header{display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header{position:relative;z-index:950;display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
 header h1{font:700 18px/1.2 var(--f-display);margin:0;letter-spacing:.01em}
 header .sub{color:var(--muted);font-size:12px}
 header .sp{flex:1}
@@ -177,7 +177,7 @@ pre.copy{max-height:260px;overflow:auto;background:var(--surface-2);padding:8px;
     <button class="btn sm" id="btn-out" data-i18n="signOut">Выйти</button>
   </div>
   <div class="seg" role="group" aria-label="Language">
-    <button id="lang-ru" aria-pressed="true">RU</button><button id="lang-az" aria-pressed="false">AZ</button>
+    <button id="lang-ru" aria-pressed="true">RU</button><button id="lang-az" aria-pressed="false">AZ</button><button id="lang-en" aria-pressed="false">EN</button>
   </div>
 </header>
 <main>
@@ -311,8 +311,72 @@ const I18N = {
 };
 let lang = 'ru';
 try{ lang = localStorage.getItem('lakes-lang') || 'ru'; }catch(e){}
-const t = k => (I18N[k] ? I18N[k][lang==='ru'?0:1] : k);
-const lbl = o => lang==='ru' ? o[1] : o[2];
+const I18N_EN = {
+ title:"Digital Lake Passport", subtitle:"Geospatial Analytics and Cartography Laboratory · Institute of Geography",
+ catalog:"Catalogue", sLakes:"lakes", sArea:"area, km²", sGeom:"with outline", sFill:"completed",
+ search:"Search by name, district, code", newLake:"+ Lake", import:"Import outlines", measure:"Measure", exportAll:"Export", fitAll:"All lakes",
+ tPass:"Passport", tMorph:"Morphometry", tObs:"Monitoring", tPhoto:"Photos", tExp:"Export",
+ allRegions:"All economic regions", allOrigins:"Any origin", sortName:"By name", sortArea:"By area", sortFill:"By completeness", sortUpd:"Recently changed",
+ dbLoad:"Connecting…",
+ noLakes:"No lakes in the catalogue yet. Add one with “+ Lake” or import outlines (GeoJSON, zipped Shapefile, KML, CSV).",
+ noMatch:"Nothing matches the filters.",
+ edit:"Edit", save:"Save", cancel:"Cancel", del:"Delete lake", close:"Close",
+ gId:"Identification", gLoc:"Location", gMorph:"Morphometry (passport values)", gHydro:"Hydrology and hydrochemistry", gEco:"Ecology and use", gSrc:"Sources and notes", gAttrs:"Original attributes (import)",
+ upd:"Changed", by:"by", demo:"demo", demoNote:"Demo record: coordinates are approximate and values are empty. Check or delete it.",
+ noGeom:"No outline uploaded. Outline-based morphometry appears after a polygon is imported.",
+ replaceGeom:"Upload / replace outline", pickPoint:"Pick point on map",
+ mArea:"Water surface area", mPer:"Shoreline length", mKs:"Shoreline development index (Ks)", mCen:"Centroid", mBbox:"Extent (length × width)", mParts:"Number of polygons",
+ mFrom:"Computed from the WGS 84 outline (geodesic, Turf.js). Ks = L / (2√(πF)).", toPass:"Copy to passport", moved:"Values copied to the passport",
+ addObs:"Add observation", noObs:"No observations yet. Add measurements of level, area, mineralization, etc.",
+ param:"Parameter", date:"Date", source:"Method / source", note:"Note",
+ oLevel:"Level, m a.s.l.", oArea:"Area, km²", oDepth:"Depth, m", oMin:"Mineralization, g/L", oTemp:"Water temp., °C", oPh:"pH",
+ addPhoto:"Add photo", noPhoto:"No photos yet.", caption:"Caption",
+ expLake:"This passport", expAll:"Whole catalogue", expHtml:"Passport (HTML)", expGeo:"GeoJSON (outline + attributes)", expCsv:"Passports table (CSV)", expGeoAll:"All lakes (GeoJSON)", expObs:"Observations (CSV)",
+ expHint:"“Print / PDF” opens the passport in a new tab: choose a printer or “Save as PDF”.",
+ copyInstead:"Download is unavailable here — copy the content:", copy:"Copy", copied:"Copied",
+ impTitle:"Import lake outlines", impDrop:"Drop a file here or click to choose. GeoJSON, Shapefile (.zip with .shp/.dbf/.prj), KML, CSV with lat/lon columns.",
+ impFound:"Features found", impPoly:"polygons", impPt:"points", impSkip:"skipped (lines/empty)",
+ impCrs:"Coordinates look projected. Choose the file’s coordinate system:", impMap:"Match passport fields to file attributes", impNone:"— skip —",
+ impAutoArea:"If area is missing, compute it from the outline", impGo:"Create passports", impDone:"Lakes imported",
+ impTarget:"Replace lake outline", impOne:"The file has several polygons — the selected one will be used:", impErr:"Could not read the file",
+ clickMap:"Click on the map to place the lake. Esc to cancel.", measHint:"Click on the map, double-click to finish, Esc to reset.",
+ dist:"Length", area:"Area",
+ confirmDel:"Delete the lake with all its observations and photos? This cannot be undone.",
+ saved:"Saved", deleted:"Deleted", errSave:"Could not save: ", readOnly:"You have view-only access",
+ quota:"Storage is full: delete unneeded records or photos.", tooBig:"The outline was very detailed and has been simplified",
+ newName:"New lake", loading:"Loading…", completeness:"Passport completeness", nObs:"observations",
+ bmOsm:"OSM map", bmSat:"Satellite (Esri)", bmTopo:"Relief (OpenTopoMap)",
+ dbOffline:"No connection to the database", sessionExp:"Session expired, please sign in again",
+ role_admin:"administrator", role_editor:"editor", role_viewer:"view only", role_null:"", role_undefined:"",
+ setupTxt:"The portal is not connected to a database yet. Paste the Project URL and anon public key from Supabase (Project Settings → API).",
+ connect:"Connect", password:"Password", signIn:"Sign in", signUp:"Create password and register", sendReset:"Send reset link",
+ haveAcc:"I have a password", firstTime:"First sign-in (register)", forgot:"Forgot password?",
+ signUpNote:"Only staff whose e-mail the administrator has added to the list can register. After registering you will receive an e-mail to confirm your address.",
+ checkMail:"Check your e-mail, follow the link, then sign in.", resetSent:"An e-mail with a link has been sent.",
+ badLogin:"Wrong e-mail or password.", notConfirmed:"Address not confirmed yet: open the e-mail from Supabase.",
+ newPassTxt:"Set a new password for the portal.", newPass:"New password (at least 8 characters)",
+ noAccess:"{e} is not on the laboratory staff list. Ask the administrator to add it, then sign in again.",
+ signOut:"Sign out", changePass:"Password", members:"Staff",
+ membersNote:"Only people on this list can sign in. Add a colleague’s e-mail, then ask them to open the portal and choose “First sign-in”.",
+ fullName:"Full name", role:"Role", addMember:"Add", expPrint:"Print / PDF", km2:"km²", km:"km", m:"m",
+ impRegionAll:"Economic region for all (if not in attributes)",
+};
+const EN_FIELDS = { name:"Name", name_ru:"Name (Russian)", code:"Inventory number", region:"Economic region", district:"Administrative district",
+ lat:"Latitude, °", lon:"Longitude, °", alt:"Water surface elevation, m a.s.l.", area:"Water surface area, km²", shore:"Shoreline length, km",
+ length:"Lake length, km", width:"Max. width, km", max_depth:"Max. depth, m", mean_depth:"Mean depth, m", volume:"Water volume, million m³",
+ catchment:"Catchment area, km²", origin:"Basin origin", regime:"Water exchange", feeding:"Water supply type", salinity:"Salinity class",
+ mineral:"Mineralization, g/L", status:"Ecological status", protect:"Protected area", uses:"Use", threats:"Threats and pressures",
+ sources:"Sources, literature", notes:"Notes" };
+const EN_OPTS = { tectonic:"Tectonic", glacial:"Glacial (cirque)", dammed:"Landslide-dammed", karst:"Karst", volcanic:"Volcanic / mud volcano",
+ lagoon:"Lagoon (Caspian relict)", floodplain:"Floodplain / oxbow", aeolian:"Deflation", artificial:"Artificial (reservoir, pond)", other:"Other",
+ open:"Open (drained)", closed:"Closed (endorheic)", seasonal:"Seasonally drying",
+ rain:"Rain", snow:"Snow / glacier", ground:"Groundwater", river:"River", mixed:"Mixed", anthrop:"Wastewater discharge",
+ fresh:"Fresh (<1 g/L)", brackish:"Brackish (1–25 g/L)", saline:"Saline (25–50 g/L)", brine:"Brine (>50 g/L)",
+ good:"Good", fair:"Fair", poor:"Poor", critical:"Critical" };
+const LOC = () => lang==='ru' ? 'ru-RU' : lang==='en' ? 'en-GB' : 'az-Latn-AZ';
+const t = k => lang==='en' ? (I18N_EN[k] ?? (I18N[k] ? I18N[k][0] : k)) : (I18N[k] ? I18N[k][lang==='ru'?0:1] : k);
+const lbl = o => lang==='ru' ? o[1] : lang==='en' ? (EN_OPTS[o[0]] || o[1]) : o[2];
+const fl = f => lang==='ru' ? f[1] : lang==='en' ? (EN_FIELDS[f[0]] || f[1]) : f[2];
 
 /* ---------- reference lists ---------- */
 const REGIONS = ["Bakı","Abşeron-Xızı","Dağlıq Şirvan","Gəncə-Daşkəsən","Qarabağ","Qazax-Tovuz","Quba-Xaçmaz","Lənkəran-Astara","Mərkəzi Aran","Mil-Muğan","Naxçıvan","Şəki-Zaqatala","Şərqi Zəngəzur","Şirvan-Salyan"];
@@ -360,8 +424,8 @@ const FILL_KEYS = ["name","region","district","lat","alt","area","max_depth","me
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-const num = (v, d=2) => (v===null||v===undefined||v===""||isNaN(+v)) ? "—" : (+v).toLocaleString(lang==='ru'?'ru-RU':'az-Latn-AZ',{maximumFractionDigits:d});
-const fmtDate = s => { if(!s) return "—"; const d=new Date(s); return isNaN(d)?esc(s):(lang==='ru'?d.toLocaleDateString('ru-RU',{year:'numeric',month:'short',day:'numeric'}):d.toLocaleDateString('ru-RU',{year:'numeric',month:'2-digit',day:'2-digit'})); };
+const num = (v, d=2) => (v===null||v===undefined||v===""||isNaN(+v)) ? "—" : (+v).toLocaleString(LOC(),{maximumFractionDigits:d});
+const fmtDate = s => { if(!s) return "—"; const d=new Date(s); return isNaN(d)?esc(s):(lang!=='az'?d.toLocaleDateString(LOC(),{year:'numeric',month:'short',day:'numeric'}):d.toLocaleDateString('ru-RU',{year:'numeric',month:'2-digit',day:'2-digit'})); };
 const optLabel = (list, key) => { const o=(LISTS[list]||[]).find(x=>x[0]===key); return o?lbl(o):(key||"—"); };
 function toast(msg, ms=2600){ const el=$("#toast"); el.textContent=msg; el.style.display="block"; clearTimeout(toast._t); toast._t=setTimeout(()=>el.style.display="none",ms); }
 function completeness(l){ let n=0; for(const k of FILL_KEYS){ const v=l[k]; if(v!==undefined&&v!==null&&v!=="") n++; } return Math.round(100*n/FILL_KEYS.length); }
@@ -472,7 +536,7 @@ function filtered(){
     if(q){ const h=[l.name,l.name_ru,l.code,l.district,l.region].join(" ").toLowerCase(); if(!h.includes(q)) return false; }
     return true;
   });
-  const s=$("#f-sort").value||"name", loc=lang==='ru'?'ru':'az';
+  const s=$("#f-sort").value||"name", loc=lang;
   arr.sort((a,b)=> s==="area" ? (+b.area||0)-(+a.area||0) : s==="fill" ? completeness(b)-completeness(a) : s==="upd" ? String(b.updated_at||"").localeCompare(String(a.updated_at||"")) : String(a.name||"").localeCompare(String(b.name||""),loc));
   return arr;
 }
@@ -573,7 +637,7 @@ function passView(l){
   let h = l.demo ? `<div class="warnbox">${esc(t("demoNote"))}</div>` : "";
   for(const [g,gk] of GROUPS){
     h += `<div class="sec"><h3>${esc(t(gk))}</h3><dl class="kv">`;
-    for(const f of F.filter(f=>f[4]===g)){ const v=fieldValue(f,l[f[0]]); h += `<dt>${esc(lang==='ru'?f[1]:f[2])}</dt><dd class="${v===null?"na":""}">${v===null?"—":v}</dd>`; }
+    for(const f of F.filter(f=>f[4]===g)){ const v=fieldValue(f,l[f[0]]); h += `<dt>${esc(fl(f))}</dt><dd class="${v===null?"na":""}">${v===null?"—":v}</dd>`; }
     h += `</dl></div>`;
   }
   if(l.attrs && Object.keys(l.attrs).length){
@@ -583,7 +647,7 @@ function passView(l){
   return h;
 }
 function input(f, v){
-  const [k,ru,az,type]=f, id="fld-"+k, lab=esc(lang==='ru'?ru:az);
+  const [k,ru,az,type]=f, id="fld-"+k, lab=esc(fl(f));
   v = v ?? "";
   if(type==="area") return `<label class="full" for="${id}">${lab}<textarea id="${id}" name="${k}">${esc(v)}</textarea></label>`;
   if(type==="region") return `<label for="${id}">${lab}<select id="${id}" name="${k}"><option value="">—</option>${REGIONS.map(r=>`<option${r===v?" selected":""}>${esc(r)}</option>`).join("")}</select></label>`;
@@ -634,7 +698,7 @@ function chartSVG(rows, key){
   const line = pts.map((p,i)=>`${i?"L":"M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join("");
   const areaP = line + `L${X(pts[pts.length-1].x).toFixed(1)},${H-pb}L${X(pts[0].x).toFixed(1)},${H-pb}Z`;
   const last=pts[pts.length-1];
-  const yrs = [new Date(x0), new Date(x1)].map(d=>d.getFullYear()===new Date(x1).getFullYear()&&x1-x0<3e10 ? d.toLocaleDateString(lang==='ru'?'ru-RU':'az-Latn-AZ',{month:'short',year:'2-digit'}) : d.getFullYear());
+  const yrs = [new Date(x0), new Date(x1)].map(d=>d.getFullYear()===new Date(x1).getFullYear()&&x1-x0<3e10 ? d.toLocaleDateString(LOC(),{month:'short',year:'2-digit'}) : d.getFullYear());
   return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="chart">${grid.join("")}
     <path d="${areaP}" fill="var(--accent)" opacity=".12"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>
     ${pts.map(p=>`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="2.5" fill="var(--accent)"><title>${esc(p.d)}: ${p.y}</title></circle>`).join("")}
@@ -814,8 +878,8 @@ function renderImport(){
   } else {
     const mapF = F.filter(f=>AUTOMAP[f[0]]);
     h += `<div class="sec"><h3>${esc(t("impMap"))}</h3><div class="form">${mapF.map(f=>{ const guess = keys.find(k=>k===f[0]) || keys.find(k=>AUTOMAP[f[0]].test(k)) || "";
-      return `<label for="map-${f[0]}">${esc(lang==='ru'?f[1]:f[2])}<select id="map-${f[0]}" data-map="${f[0]}"><option value="">${esc(t("impNone"))}</option>${keys.map(k=>`<option${k===guess?" selected":""}>${esc(k)}</option>`).join("")}</select></label>`; }).join("")}
-      <label class="full" for="imp-region">${esc(lang==='ru'?"Экономический район для всех (если не в атрибутах)":"Hamısı üçün iqtisadi rayon (atributlarda yoxdursa)")}<select id="imp-region"><option value="">—</option>${REGIONS.map(r=>`<option>${esc(r)}</option>`).join("")}</select></label>
+      return `<label for="map-${f[0]}">${esc(fl(f))}<select id="map-${f[0]}" data-map="${f[0]}"><option value="">${esc(t("impNone"))}</option>${keys.map(k=>`<option${k===guess?" selected":""}>${esc(k)}</option>`).join("")}</select></label>`; }).join("")}
+      <label class="full" for="imp-region">${esc(lang==='en'?t("impRegionAll"):lang==='ru'?"Экономический район для всех (если не в атрибутах)":"Hamısı üçün iqtisadi rayon (atributlarda yoxdursa)")}<select id="imp-region"><option value="">—</option>${REGIONS.map(r=>`<option>${esc(r)}</option>`).join("")}</select></label>
       <label class="full" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="imp-auto" checked> ${esc(t("impAutoArea"))}</label></div></div>
       <div id="imp-prog"></div><div class="actions"><button class="btn pri" id="imp-go"${(!polys.length&&!pts.length)||projected?" disabled":""}>${esc(t("impGo"))} (${polys.length+pts.length})</button></div>`;
   }
@@ -888,7 +952,7 @@ async function doExport(kind, l){
 }
 function passportHTML(l){
   const m = morphCalc(l.id);
-  const rows = g => F.filter(f=>f[4]===g).map(f=>{ const v=fieldValue(f,l[f[0]]); return `<tr><th>${esc(lang==='ru'?f[1]:f[2])}</th><td>${v===null?"—":v.replace(/<span class="chip [a-z]+">|<\/span>/g,"")}</td></tr>`; }).join("");
+  const rows = g => F.filter(f=>f[4]===g).map(f=>{ const v=fieldValue(f,l[f[0]]); return `<tr><th>${esc(fl(f))}</th><td>${v===null?"—":v.replace(/<span class="chip [a-z]+">|<\/span>/g,"")}</td></tr>`; }).join("");
   const svg = (()=>{ const g=geoms.get(l.id); if(!g||!g.geometry) return ""; const bb=turf.bbox({type:"Feature",geometry:g.geometry}); const k=Math.cos((bb[1]+bb[3])/2*Math.PI/180); const w=(bb[2]-bb[0])*k||1e-6, h=(bb[3]-bb[1])||1e-6, S=300/Math.max(w,h);
     const ring=r=>r.map((c,i)=>`${i?"L":"M"}${((c[0]-bb[0])*k*S+10).toFixed(1)},${((bb[3]-c[1])*S+10).toFixed(1)}`).join("")+"Z";
     const polys = g.geometry.type==="Polygon"?[g.geometry.coordinates]:g.geometry.coordinates; const d=polys.map(p=>p.map(ring).join("")).join("");
@@ -904,21 +968,23 @@ function passportHTML(l){
   <div class="sub">${esc(t("subtitle"))}</div><h1>${esc(t("tPass"))}: ${esc(l.name||"")}</h1><div class="sub">${esc([l.name_ru,l.code&&("№ "+l.code),l.region,l.district].filter(Boolean).join(" · "))}</div>
   <div class="grid"><div><h2>${esc(t("gId"))}</h2><table>${rows("id")}</table><h2>${esc(t("gLoc"))}</h2><table>${rows("loc")}</table></div><div>${svg}${m?`<table><tr><th>${esc(t("mArea"))}</th><td>${num(m.A,4)} ${t("km2")}</td></tr><tr><th>${esc(t("mPer"))}</th><td>${num(m.P,3)} ${t("km")}</td></tr><tr><th>Ks</th><td>${num(m.Ks,3)}</td></tr></table>`:""}</div></div>
   <h2>${esc(t("gMorph"))}</h2><table>${rows("morph")}</table><h2>${esc(t("gHydro"))}</h2><table>${rows("hydro")}</table><h2>${esc(t("gEco"))}</h2><table>${rows("eco")}</table><h2>${esc(t("gSrc"))}</h2><table>${rows("src")}</table>${obsT}
-  <footer>${esc(t("title"))} · ${new Date().toLocaleDateString(lang==='ru'?'ru-RU':'az-Latn-AZ')} · ID ${esc(l.id)}</footer></body></html>`;
+  <footer>${esc(t("title"))} · ${new Date().toLocaleDateString(LOC())} · ID ${esc(l.id)}</footer></body></html>`;
 }
 $("#btn-export").onclick = ()=>{ openModal(`<h3>${esc(t("expAll"))}</h3><div class="actions"><button class="btn" data-x="csv">${esc(t("expCsv"))}</button><button class="btn" data-x="geoall">${esc(t("expGeoAll"))}</button><button class="btn" data-close>${esc(t("close"))}</button></div>`); $("#mbox").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{ const k=b.dataset.x; closeModal(); doExport(k); }); };
 
 /* ---------- language ---------- */
 function applyLang(){
-  document.documentElement.lang = lang==='ru'?'ru':'az';
+  document.documentElement.lang = lang;
   document.title = t("title");
   document.querySelectorAll("[data-i18n]").forEach(e=>e.textContent=t(e.dataset.i18n));
   document.querySelectorAll("[data-i18n-ph]").forEach(e=>e.placeholder=t(e.dataset.i18nPh));
-  $("#lang-ru").setAttribute("aria-pressed",String(lang==='ru')); $("#lang-az").setAttribute("aria-pressed",String(lang==='az'));
+  ["ru","az","en"].forEach(x=>$("#lang-"+x).setAttribute("aria-pressed",String(lang===x)));
   fillSelects(); drawBase(); setDb(dbState); renderList(); if(selId) renderDrawer();
+  if(lastGate && $("#gate").classList.contains("open")) lastGate();
 }
 $("#lang-ru").onclick=()=>{ lang='ru'; ls.set('lakes-lang','ru'); applyLang(); };
 $("#lang-az").onclick=()=>{ lang='az'; ls.set('lakes-lang','az'); applyLang(); };
+$("#lang-en").onclick=()=>{ lang='en'; ls.set('lakes-lang','en'); applyLang(); };
 
 /* ---------- data wiring ---------- */
 let dbState = "load", firstFit = true;
@@ -954,8 +1020,10 @@ window.addEventListener("hashchange", ()=>{ const h=location.hash.match(/^#lake-
 
 /* ---------- auth screens ---------- */
 function gate(html){ const g=$("#gate"); g.innerHTML=`<div class="gbox"><h2>${esc(t("title"))}</h2><p class="note">${esc(t("subtitle"))}</p>${html}</div>`; g.classList.add("open"); return g; }
-function closeGate(){ $("#gate").classList.remove("open"); $("#gate").innerHTML=""; }
+function closeGate(){ lastGate=null; $("#gate").classList.remove("open"); $("#gate").innerHTML=""; }
+let lastGate = null;
 function showSetup(){
+  lastGate = showSetup;
   const g = gate(`<p>${esc(t("setupTxt"))}</p><form id="sf" class="gform">
     <label for="sf-url">Project URL<input type="text" id="sf-url" required placeholder="https://xxxx.supabase.co"></label>
     <label for="sf-key">anon public key<textarea id="sf-key" required rows="3"></textarea></label>
@@ -963,6 +1031,7 @@ function showSetup(){
   $("#sf").onsubmit=e=>{ e.preventDefault(); ls.set("lakes-sb-url",$("#sf-url").value.trim()); ls.set("lakes-sb-key",$("#sf-key").value.trim()); location.reload(); };
 }
 function showLogin(mode="in", msg=""){
+  lastGate = ()=>showLogin(mode, msg);
   const g = gate(`${msg?`<div class="warnbox">${esc(msg)}</div>`:""}<form id="lf" class="gform">
     <label for="lf-email">E-mail<input type="email" id="lf-email" autocomplete="username" required></label>
     ${mode!=="reset"?`<label for="lf-pass">${esc(t("password"))}<input type="password" id="lf-pass" autocomplete="${mode==="up"?"new-password":"current-password"}" minlength="8" required></label>`:""}
@@ -979,10 +1048,12 @@ function showLogin(mode="in", msg=""){
   };
 }
 function showSetPassword(){
+  lastGate = showSetPassword;
   const g = gate(`<p>${esc(t("newPassTxt"))}</p><form id="pf2" class="gform"><label for="np">${esc(t("newPass"))}<input type="password" id="np" minlength="8" autocomplete="new-password" required></label><button class="btn pri" type="submit">${esc(t("save"))}</button></form>`);
   $("#pf2").onsubmit=async e=>{ e.preventDefault(); try{ chk(await sb.auth.updateUser({password:$("#np").value})); toast(t("saved")); history.replaceState(null,"",location.pathname); closeGate(); afterLogin(); }catch(err){ toast(err.message,5000); } };
 }
 function showNoAccess(){
+  lastGate = showNoAccess;
   const g = gate(`<div class="warnbox">${esc(t("noAccess").replace("{e}", me.email))}</div><div class="actions"><button class="btn" id="na-out">${esc(t("signOut"))}</button></div>`);
   $("#na-out").onclick=()=>sb.auth.signOut();
 }
