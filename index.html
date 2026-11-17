@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Цифровой паспорт озёр</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;600;700&family=Noto+Serif:wght@600;700&family=Noto+Sans+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+/* Layout: header, left catalog rail, full map, right passport drawer. Palette: limnic teal on mineral grey. */
+:root{
+  --bg:#f3f5f4; --surface:#ffffff; --surface-2:#eaefee; --ink:#18252a; --muted:#5b6b70; --line:#d5dddc;
+  --accent:#0b6e79; --accent-ink:#ffffff; --accent-soft:#d6ecee;
+  --water:#c9dde3; --land:#f4f1ea; --land-az:#fbfaf6; --border-c:#9aa7a6; --az-border:#3c5258;
+  --lake:#1b7fa6; --lake-sel:#e2611f;
+  --good:#2f8a4c; --warn:#c08a12; --bad:#c2452d; --crit:#8e1f3a;
+  --f-display:"Noto Serif",Georgia,serif; --f-body:"Noto Sans",system-ui,-apple-system,"Segoe UI",sans-serif; --f-mono:"Noto Sans Mono",ui-monospace,Menlo,monospace;
+  --r:8px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  color-scheme:dark; --bg:#0f1719; --surface:#162226; --surface-2:#1d2c31; --ink:#e3ecec; --muted:#93a6a9; --line:#2a3b40;
+  --accent:#4fb8c3; --accent-ink:#06282c; --accent-soft:#173a3f;
+  --water:#13303a; --land:#1e2a2c; --land-az:#26363a; --border-c:#4a5c5f; --az-border:#9cb9bd;
+  --lake:#5cc3e6; --lake-sel:#ff9a5c; --good:#5cc27c; --warn:#e3b341; --bad:#ef7a62; --crit:#e46a8a;
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark; --bg:#0f1719; --surface:#162226; --surface-2:#1d2c31; --ink:#e3ecec; --muted:#93a6a9; --line:#2a3b40;
+  --accent:#4fb8c3; --accent-ink:#06282c; --accent-soft:#173a3f;
+  --water:#13303a; --land:#1e2a2c; --land-az:#26363a; --border-c:#4a5c5f; --az-border:#9cb9bd;
+  --lake:#5cc3e6; --lake-sel:#ff9a5c; --good:#5cc27c; --warn:#e3b341; --bad:#ef7a62; --crit:#e46a8a;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 var(--f-body);display:flex;flex-direction:column;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+header{display:flex;align-items:center;gap:16px;padding:10px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header h1{font:700 18px/1.2 var(--f-display);margin:0;letter-spacing:.01em}
+header .sub{color:var(--muted);font-size:12px}
+header .sp{flex:1}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;background:transparent;padding:4px 10px;font-size:12px;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.status{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--good)} .dot.off{background:var(--warn)}
+main{flex:1;display:flex;min-height:0;position:relative}
+aside#rail{width:340px;flex:none;display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--line);min-height:0}
+.rail-top{padding:12px;display:flex;flex-direction:column;gap:8px;border-bottom:1px solid var(--line)}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.tile{background:var(--surface-2);border-radius:6px;padding:6px 8px}
+.tile b{display:block;font:600 16px/1.2 var(--f-body);font-variant-numeric:tabular-nums}
+.tile span{font-size:10.5px;color:var(--muted);line-height:1.2;display:block}
+input[type=search],input[type=text],input[type=number],input[type=date],select,textarea{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--surface);min-width:0}
+textarea{resize:vertical;min-height:56px}
+.row{display:flex;gap:6px;align-items:center}
+.row>*{flex:1;min-width:0}
+.btn{border:1px solid var(--line);background:var(--surface);padding:6px 10px;border-radius:6px;font-weight:600;font-size:13px;white-space:nowrap}
+.btn:hover{border-color:var(--accent)}
+.btn.pri{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn.sm{padding:3px 8px;font-size:12px}
+#list{flex:1;overflow:auto;padding:4px 0}
+.item{display:grid;grid-template-columns:1fr auto;gap:2px 8px;padding:8px 12px;border-left:3px solid transparent;cursor:pointer}
+.item:hover{background:var(--surface-2)}
+.item.sel{border-left-color:var(--lake-sel);background:var(--accent-soft)}
+.item .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item .meta{grid-column:1;font-size:12px;color:var(--muted)}
+.item .ar{grid-row:1/3;grid-column:2;text-align:right;font-variant-numeric:tabular-nums;font-size:12px;color:var(--muted);align-self:center}
+.item .ar b{display:block;color:var(--ink);font-size:13px}
+.bar{height:3px;background:var(--line);border-radius:2px;overflow:hidden;margin-top:4px;grid-column:1}
+.bar i{display:block;height:100%;background:var(--accent)}
+.empty{padding:24px 16px;color:var(--muted);text-align:center}
+.chip{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:var(--surface-2);color:var(--muted);font-weight:600}
+.chip.good{background:color-mix(in srgb,var(--good) 18%,transparent);color:var(--good)}
+.chip.warn{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+.chip.bad{background:color-mix(in srgb,var(--bad) 18%,transparent);color:var(--bad)}
+.chip.crit{background:color-mix(in srgb,var(--crit) 20%,transparent);color:var(--crit)}
+.chip.demo{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+#mapwrap{flex:1;position:relative;min-width:0}
+#map{position:absolute;inset:0;background:var(--water)}
+.leaflet-container{font:inherit;background:var(--water)}
+.maptools{position:absolute;top:10px;left:50px;z-index:500;display:flex;gap:6px;flex-wrap:wrap}
+.maptools .btn{box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.maptools .btn[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+#coords{position:absolute;left:60px;bottom:10px;z-index:500;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font:12px var(--f-mono);font-variant-numeric:tabular-nums}
+#hint{position:absolute;top:52px;left:50%;transform:translateX(-50%);z-index:500;background:var(--ink);color:var(--bg);padding:6px 12px;border-radius:6px;font-size:13px;display:none;max-width:90%}
+#measure{position:absolute;right:10px;bottom:10px;z-index:500;background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font-size:12px;display:none;font-variant-numeric:tabular-nums}
+.leaflet-tooltip{font:12px var(--f-body);background:var(--surface);color:var(--ink);border-color:var(--line)}
+.leaflet-tooltip-top:before{border-top-color:var(--line)}
+.leaflet-bar a{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.leaflet-control-scale-line{background:color-mix(in srgb,var(--surface) 80%,transparent);color:var(--ink);border-color:var(--ink)}
+.leaflet-control-attribution{background:color-mix(in srgb,var(--surface) 80%,transparent)!important;color:var(--muted)}
+.leaflet-control-attribution a{color:var(--accent)}
+/* drawer */
+#drawer{position:absolute;top:0;right:0;bottom:0;width:460px;max-width:100%;background:var(--surface);border-left:1px solid var(--line);z-index:600;display:none;flex-direction:column;box-shadow:-4px 0 18px rgba(0,0,0,.12)}
+#drawer.open{display:flex}
+.dh{padding:14px 16px 0;display:flex;flex-direction:column;gap:6px}
+.dh .top{display:flex;align-items:flex-start;gap:8px}
+.dh h2{font:700 21px/1.2 var(--f-display);margin:0;flex:1;text-wrap:balance}
+.dh .ids{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-top:8px;overflow-x:auto}
+.tabs button{border:0;background:transparent;padding:8px 10px;font-weight:600;font-size:13px;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.db{flex:1;overflow:auto;padding:14px 16px 24px}
+.sec{margin-bottom:18px}
+.sec h3{font:600 11px/1 var(--f-body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0 0 8px}
+dl.kv{display:grid;grid-template-columns:minmax(120px,44%) 1fr;gap:5px 12px;margin:0}
+dl.kv dt{color:var(--muted);font-size:13px}
+dl.kv dd{margin:0;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+dl.kv dd.na{color:var(--line)}
+.form{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+.form label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.form label.full{grid-column:1/-1}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.note{font-size:12px;color:var(--muted)}
+.warnbox{font-size:12px;padding:8px 10px;border-radius:6px;background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--ink);margin-bottom:12px}
+table.t{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+table.t th,table.t td{padding:5px 6px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+table.t th{color:var(--muted);font-weight:600;font-size:11.5px}
+table.t th:first-child,table.t td:first-child{text-align:left}
+.tw{overflow-x:auto}
+.chart{width:100%;height:auto;display:block}
+.photos{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.photos figure{margin:0;background:var(--surface-2);border-radius:6px;overflow:hidden;position:relative}
+.photos img{width:100%;height:100px;object-fit:cover;display:block;cursor:zoom-in}
+.photos figcaption{font-size:11.5px;padding:4px 6px;color:var(--muted)}
+.photos .x{position:absolute;top:4px;right:4px;background:rgba(0,0,0,.55);color:#fff;border:0;border-radius:4px;padding:0 6px;font-size:13px}
+/* modal */
+.modal{position:fixed;inset:0;background:rgba(10,20,22,.5);z-index:1000;display:none;align-items:center;justify-content:center;padding:16px}
+.modal.open{display:flex}
+.mbox{background:var(--surface);border-radius:10px;max-width:640px;width:100%;max-height:90%;overflow:auto;padding:18px 20px;box-shadow:0 10px 40px rgba(0,0,0,.3)}
+.mbox h3{font:700 18px/1.2 var(--f-display);margin:0 0 10px}
+.mbox img.big{max-width:100%;display:block;margin:auto;border-radius:6px}
+.drop{border:2px dashed var(--line);border-radius:8px;padding:22px;text-align:center;color:var(--muted)}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+progress{width:100%}
+pre.copy{max-height:260px;overflow:auto;background:var(--surface-2);padding:8px;border-radius:6px;font:11px var(--f-mono);white-space:pre-wrap;word-break:break-all}
+#toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:6px;z-index:1100;font-size:13px;display:none;max-width:90%}
+@media (max-width:820px){
+  aside#rail{position:absolute;inset:0 auto 0 0;z-index:700;width:100%;display:none}
+  aside#rail.open{display:flex}
+  #railToggle{display:inline-flex!important}
+  #drawer{width:100%}
+  .tiles{grid-template-columns:repeat(2,1fr)}
+}
+#railToggle{display:none}
+#userbox[hidden]{display:none!important}
+#gate{position:fixed;inset:0;z-index:900;background:var(--bg);display:none;align-items:center;justify-content:center;padding:16px;overflow:auto}
+#gate.open{display:flex}
+.gbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:24px;max-width:420px;width:100%;box-shadow:0 8px 30px rgba(0,0,0,.08)}
+.gbox h2{font:700 22px/1.2 var(--f-display);margin:0 0 4px}
+.gform{display:flex;flex-direction:column;gap:10px;margin-top:14px}
+.gform label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted)}
+.glinks{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+.glinks .btn{color:var(--accent)}
+.leaflet-control-layers{background:var(--surface);color:var(--ink);border-color:var(--line)!important}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <button class="btn sm" id="railToggle" data-i18n="catalog">Каталог</button>
+  <div>
+    <h1 data-i18n="title">Цифровой паспорт озёр</h1>
+    <div class="sub" data-i18n="subtitle">Лаборатория геопространственной аналитики и картографии · Институт географии</div>
+  </div>
+  <div class="sp"></div>
+  <div class="status"><span class="dot" id="dbdot"></span><span id="dbstat">…</span></div>
+  <div id="userbox" style="display:flex;gap:6px;flex-wrap:wrap" hidden>
+    <button class="btn sm" id="btn-members" hidden data-i18n="members">Сотрудники</button>
+    <button class="btn sm" id="btn-pass" data-i18n="changePass">Пароль</button>
+    <button class="btn sm" id="btn-out" data-i18n="signOut">Выйти</button>
+  </div>
+  <div class="seg" role="group" aria-label="Language">
+    <button id="lang-ru" aria-pressed="true">RU</button><button id="lang-az" aria-pressed="false">AZ</button>
+  </div>
+</header>
+<main>
+  <aside id="rail">
+    <div class="rail-top">
+      <div class="tiles">
+        <div class="tile"><b id="s-n">0</b><span data-i18n="sLakes">озёр</span></div>
+        <div class="tile"><b id="s-a">—</b><span data-i18n="sArea">площадь, км²</span></div>
+        <div class="tile"><b id="s-g">0</b><span data-i18n="sGeom">с контуром</span></div>
+        <div class="tile"><b id="s-c">—</b><span data-i18n="sFill">заполнено</span></div>
+      </div>
+      <input type="search" id="q" data-i18n-ph="search" placeholder="Поиск по названию, району, коду">
+      <div class="row">
+        <select id="f-region" aria-label="region"></select>
+        <select id="f-origin" aria-label="origin"></select>
+      </div>
+      <div class="row">
+        <select id="f-sort" aria-label="sort"></select>
+        <button class="btn pri" id="btn-new" data-i18n="newLake">+ Озеро</button>
+      </div>
+    </div>
+    <div id="list"></div>
+  </aside>
+  <div id="mapwrap">
+    <div id="map"></div>
+    <div class="maptools">
+      <button class="btn" id="btn-import" data-i18n="import">Импорт контуров</button>
+      <button class="btn" id="btn-measure" aria-pressed="false" data-i18n="measure">Измерить</button>
+      <button class="btn" id="btn-export" data-i18n="exportAll">Экспорт</button>
+      <button class="btn" id="btn-fit" data-i18n="fitAll">Все озёра</button>
+    </div>
+    <div id="hint"></div>
+    <div id="coords">—</div>
+    <div id="measure"></div>
+    <section id="drawer" aria-label="passport">
+      <div class="dh">
+        <div class="top"><h2 id="d-title">—</h2><button class="btn ghost" id="d-close" aria-label="close">✕</button></div>
+        <div class="ids" id="d-ids"></div>
+        <div class="tabs" role="tablist">
+          <button role="tab" data-tab="pass" aria-selected="true" data-i18n="tPass">Паспорт</button>
+          <button role="tab" data-tab="morph" aria-selected="false" data-i18n="tMorph">Морфометрия</button>
+          <button role="tab" data-tab="obs" aria-selected="false" data-i18n="tObs">Мониторинг</button>
+          <button role="tab" data-tab="photo" aria-selected="false" data-i18n="tPhoto">Фото</button>
+          <button role="tab" data-tab="exp" aria-selected="false" data-i18n="tExp">Экспорт</button>
+        </div>
+      </div>
+      <div class="db" id="d-body"></div>
+    </section>
+  </div>
+</main>
+<div id="gate" aria-live="polite"></div>
+<div class="modal" id="modal"><div class="mbox" id="mbox"></div></div>
+<div id="toast" role="status"></div>
+<input type="file" id="fileIn" hidden accept=".geojson,.json,.zip,.kml,.csv">
+<input type="file" id="photoIn" hidden accept="image/*" multiple>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/shpjs@4.0.4/dist/shp.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   НАСТРОЙКА: вставьте сюда данные своего проекта Supabase
+   (Project Settings → API → Project URL и anon public key).
+   Ключ anon публичный: данные защищены правами доступа в базе.
+   ===================================================================== */
+const SUPABASE_URL = "https://felfbqaiqzbkywjacvft.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZlbGZicWFpcXpia3l3amFjdmZ0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5MzcxODgsImV4cCI6MjExMDUxMzE4OH0.3c1rimoQSp8pnIIDvBP53DXhsQ9hFcL-r3eZD8OeIps";
+/* ---------- i18n ---------- */
+const I18N = {
+ title:["Цифровой паспорт озёр","Göllərin rəqəmsal pasportu"],
+ subtitle:["Лаборатория геопространственной аналитики и картографии · Институт географии","Geoməkan analitikası və kartoqrafiya laboratoriyası · Coğrafiya İnstitutu"],
+ catalog:["Каталог","Kataloq"], sLakes:["озёр","göl"], sArea:["площадь, км²","sahə, km²"], sGeom:["с контуром","konturlu"], sFill:["заполнено","doldurulub"],
+ search:["Поиск по названию, району, коду","Ad, rayon, kod üzrə axtarış"], newLake:["+ Озеро","+ Göl"],
+ import:["Импорт контуров","Kontur idxalı"], measure:["Измерить","Ölçmə"], exportAll:["Экспорт","İxrac"], fitAll:["Все озёра","Bütün göllər"],
+ tPass:["Паспорт","Pasport"], tMorph:["Морфометрия","Morfometriya"], tObs:["Мониторинг","Monitorinq"], tPhoto:["Фото","Foto"], tExp:["Экспорт","İxrac"],
+ allRegions:["Все экономические районы","Bütün iqtisadi rayonlar"], allOrigins:["Любой генезис","İstənilən mənşə"],
+ sortName:["По названию","Ada görə"], sortArea:["По площади","Sahəyə görə"], sortFill:["По заполненности","Doldurulmaya görə"], sortUpd:["Недавно изменённые","Son dəyişənlər"],
+ dbLoad:["Подключение…","Qoşulur…"],
+ noLakes:["В каталоге пока нет озёр. Добавьте озеро кнопкой «+ Озеро» или импортируйте контуры (GeoJSON, Shapefile .zip, KML, CSV).","Kataloqda hələ göl yoxdur. «+ Göl» düyməsi ilə əlavə edin və ya konturları idxal edin (GeoJSON, Shapefile .zip, KML, CSV)."],
+ noMatch:["Ничего не найдено по фильтрам.","Filtrlərə uyğun nəticə yoxdur."],
+ edit:["Редактировать","Redaktə et"], save:["Сохранить","Yadda saxla"], cancel:["Отмена","Ləğv et"], del:["Удалить озеро","Gölü sil"], close:["Закрыть","Bağla"],
+ gId:["Идентификация","İdentifikasiya"], gLoc:["Местоположение","Yerləşmə"], gMorph:["Морфометрия (паспортные значения)","Morfometriya (pasport göstəriciləri)"], gHydro:["Гидрология и гидрохимия","Hidrologiya və hidrokimya"], gEco:["Экология и использование","Ekologiya və istifadə"], gSrc:["Источники и примечания","Mənbələr və qeydlər"], gAttrs:["Исходные атрибуты (импорт)","İlkin atributlar (idxal)"],
+ upd:["Изменено","Dəyişdirilib"], by:["кем","kim"], demo:["демо","demo"], demoNote:["Демонстрационная запись: координаты приблизительные, значения не заполнены. Проверьте или удалите.","Demo qeyd: koordinatlar təqribidir, göstəricilər doldurulmayıb. Yoxlayın və ya silin."],
+ noGeom:["Контур озера не загружен. Морфометрия по контуру появится после импорта полигона.","Gölün konturu yüklənməyib. Kontur üzrə morfometriya poliqon idxal edildikdən sonra görünəcək."],
+ replaceGeom:["Загрузить / заменить контур","Konturu yüklə / əvəz et"], pickPoint:["Указать точку на карте","Xəritədə nöqtə seç"],
+ mArea:["Площадь зеркала","Su güzgüsünün sahəsi"], mPer:["Длина береговой линии","Sahil xəttinin uzunluğu"], mKs:["Коэфф. изрезанности берега (Ks)","Sahil xəttinin girintililik əmsalı (Ks)"], mCen:["Центроид","Mərkəz nöqtəsi"], mBbox:["Габариты (длина × ширина)","Ölçülər (uzunluq × en)"], mParts:["Число полигонов (островов вне)","Poliqon sayı"],
+ mFrom:["Рассчитано по контуру в WGS 84 (геодезически, Turf.js). Ks = L / (2√(πF)).","WGS 84 konturu üzrə hesablanıb (geodeziya üsulu, Turf.js). Ks = L / (2√(πF))."],
+ toPass:["Перенести в паспорт","Pasporta köçür"], moved:["Значения перенесены в паспорт","Göstəricilər pasporta köçürüldü"],
+ addObs:["Добавить наблюдение","Müşahidə əlavə et"], noObs:["Наблюдений пока нет. Добавьте измерения уровня, площади, минерализации и т. п.","Hələ müşahidə yoxdur. Səviyyə, sahə, minerallaşma və s. ölçmələri əlavə edin."],
+ param:["Параметр","Parametr"], date:["Дата","Tarix"], source:["Метод / источник","Üsul / mənbə"], note:["Примечание","Qeyd"],
+ oLevel:["Уровень, м абс.","Səviyyə, m mütləq"], oArea:["Площадь, км²","Sahə, km²"], oDepth:["Глубина, м","Dərinlik, m"], oMin:["Минерализация, г/л","Minerallaşma, q/l"], oTemp:["Темп. воды, °C","Suyun temp., °C"], oPh:["pH","pH"],
+ addPhoto:["Добавить фото","Foto əlavə et"], noPhoto:["Фотографий пока нет.","Hələ foto yoxdur."], caption:["Подпись","İzah"],
+ expLake:["Этот паспорт","Bu pasport"], expAll:["Весь каталог","Bütün kataloq"], expHtml:["Паспорт для печати (HTML)","Çap üçün pasport (HTML)"], expGeo:["GeoJSON (контур + атрибуты)","GeoJSON (kontur + atributlar)"], expCsv:["Таблица паспортов (CSV)","Pasport cədvəli (CSV)"], expGeoAll:["Все озёра (GeoJSON)","Bütün göllər (GeoJSON)"], expObs:["Наблюдения (CSV)","Müşahidələr (CSV)"],
+ expHint:["«Печать / PDF» открывает паспорт в новой вкладке: выберите принтер или «Сохранить как PDF».","«Çap / PDF» pasportu yeni vərəqdə açır: printer və ya «PDF kimi saxla» seçin."],
+ copyInstead:["Скачивание недоступно в этом окне — скопируйте содержимое:","Bu pəncərədə yükləmə mümkün deyil — məzmunu kopyalayın:"], copy:["Копировать","Kopyala"], copied:["Скопировано","Kopyalandı"],
+ impTitle:["Импорт контуров озёр","Göl konturlarının idxalı"], impDrop:["Перетащите файл сюда или нажмите, чтобы выбрать. GeoJSON, Shapefile (.zip с .shp/.dbf/.prj), KML, CSV с колонками lat/lon.","Faylı bura sürükləyin və ya seçmək üçün klikləyin. GeoJSON, Shapefile (.zip: .shp/.dbf/.prj), KML, lat/lon sütunlu CSV."],
+ impFound:["Найдено объектов","Tapılan obyektlər"], impPoly:["полигонов","poliqon"], impPt:["точек","nöqtə"], impSkip:["пропущено (линии/пустые)","buraxılıb (xətt/boş)"],
+ impCrs:["Координаты похожи на проекцию. Выберите систему координат файла:","Koordinatlar proyeksiyaya bənzəyir. Faylın koordinat sistemini seçin:"],
+ impMap:["Сопоставление полей паспорта с атрибутами файла","Pasport sahələrinin fayl atributları ilə uyğunlaşdırılması"], impNone:["— не брать —","— götürmə —"],
+ impAutoArea:["Если площадь не задана — рассчитать по контуру","Sahə verilməyibsə — kontur üzrə hesabla"], impGo:["Создать паспорта","Pasportları yarat"], impDone:["Импортировано озёр","İdxal edilmiş göllər"],
+ impTarget:["Заменить контур озера","Gölün konturunu əvəz et"], impOne:["В файле несколько полигонов — будет взят выбранный:","Faylda bir neçə poliqon var — seçilən götürüləcək:"],
+ impErr:["Не удалось прочитать файл","Faylı oxumaq mümkün olmadı"],
+ clickMap:["Щёлкните по карте, чтобы поставить озеро. Esc — отмена.","Gölü yerləşdirmək üçün xəritəyə klikləyin. Esc — ləğv."],
+ measHint:["Щёлкайте по карте, двойной щелчок — завершить, Esc — сброс.","Xəritəyə klikləyin, iki dəfə klik — bitir, Esc — sıfırla."],
+ dist:["Длина","Uzunluq"], area:["Площадь","Sahə"],
+ confirmDel:["Удалить озеро и все его наблюдения и фото? Это действие нельзя отменить.","Göl və onun bütün müşahidələri və fotoları silinsin? Bu əməliyyat geri qaytarıla bilməz."],
+ saved:["Сохранено","Yadda saxlanıldı"], deleted:["Удалено","Silindi"], errSave:["Не удалось сохранить: ","Yadda saxlamaq mümkün olmadı: "], readOnly:["У вас доступ только для просмотра","Sizin yalnız baxış hüququnuz var"],
+ quota:["База заполнена: удалите лишние записи или фото.","Baza doludur: lazımsız qeydləri və ya fotoları silin."], tooBig:["Контур очень детальный и был упрощён","Kontur çox detallı idi və sadələşdirildi"],
+ newName:["Новое озеро","Yeni göl"], loading:["Загрузка…","Yüklənir…"], completeness:["Заполненность паспорта","Pasportun doldurulması"],
+ nObs:["наблюдений","müşahidə"],
+ bmOsm:["Карта OSM","OSM xəritəsi"], bmSat:["Спутник (Esri)","Peyk (Esri)"], bmTopo:["Рельеф (OpenTopoMap)","Relyef (OpenTopoMap)"],
+ dbOffline:["Нет связи с базой","Baza ilə əlaqə yoxdur"], sessionExp:["Сеанс истёк, войдите снова","Seans bitib, yenidən daxil olun"],
+ role_admin:["администратор","administrator"], role_editor:["редактор","redaktor"], role_viewer:["только просмотр","yalnız baxış"], role_null:["",""], role_undefined:["",""],
+ setupTxt:["Портал ещё не подключён к базе. Вставьте Project URL и anon public key из Supabase (Project Settings → API).","Portal hələ bazaya qoşulmayıb. Supabase-dən Project URL və anon public key daxil edin (Project Settings → API)."],
+ connect:["Подключить","Qoş"], password:["Пароль","Şifrə"], signIn:["Войти","Daxil ol"], signUp:["Создать пароль и зарегистрироваться","Şifrə yarat və qeydiyyatdan keç"], sendReset:["Отправить ссылку для сброса","Bərpa linkini göndər"],
+ haveAcc:["У меня есть пароль","Şifrəm var"], firstTime:["Первый вход (регистрация)","İlk giriş (qeydiyyat)"], forgot:["Забыли пароль?","Şifrəni unutmusunuz?"],
+ signUpNote:["Зарегистрироваться может только сотрудник, чей e-mail администратор добавил в список. После регистрации придёт письмо для подтверждения адреса.","Yalnız e-poçtu administrator tərəfindən siyahıya əlavə edilmiş əməkdaş qeydiyyatdan keçə bilər. Qeydiyyatdan sonra ünvanı təsdiqləmək üçün məktub gələcək."],
+ checkMail:["Проверьте почту и перейдите по ссылке из письма, затем войдите.","E-poçtunuzu yoxlayın, məktubdakı linkə keçin, sonra daxil olun."], resetSent:["Письмо со ссылкой отправлено.","Linkli məktub göndərildi."],
+ badLogin:["Неверный e-mail или пароль.","E-poçt və ya şifrə yanlışdır."], notConfirmed:["Адрес ещё не подтверждён: откройте письмо от Supabase.","Ünvan hələ təsdiqlənməyib: Supabase məktubunu açın."],
+ newPassTxt:["Задайте новый пароль для входа в портал.","Portala giriş üçün yeni şifrə təyin edin."], newPass:["Новый пароль (не короче 8 символов)","Yeni şifrə (ən azı 8 simvol)"],
+ noAccess:["Адрес {e} не входит в список сотрудников лаборатории. Попросите администратора добавить его и войдите снова.","{e} ünvanı laboratoriya əməkdaşlarının siyahısında yoxdur. Administratordan onu əlavə etməsini xahiş edin və yenidən daxil olun."],
+ signOut:["Выйти","Çıxış"], changePass:["Пароль","Şifrə"], members:["Сотрудники","Əməkdaşlar"],
+ membersNote:["Войти в портал может только тот, кто есть в этом списке. Добавьте e-mail коллеги, затем пусть он откроет портал и выберет «Первый вход».","Portala yalnız bu siyahıda olanlar daxil ola bilər. Həmkarın e-poçtunu əlavə edin, sonra o, portalı açıb «İlk giriş» seçsin."],
+ fullName:["ФИО","Soyad, ad"], role:["Роль","Rol"], addMember:["Добавить","Əlavə et"],
+ expPrint:["Печать / PDF","Çap / PDF"], km2:["км²","km²"], km:["км","km"], m:["м","m"],
+};
+let lang = 'ru';
+try{ lang = localStorage.getItem('lakes-lang') || 'ru'; }catch(e){}
+const t = k => (I18N[k] ? I18N[k][lang==='ru'?0:1] : k);
+const lbl = o => lang==='ru' ? o[1] : o[2];
+
+/* ---------- reference lists ---------- */
+const REGIONS = ["Bakı","Abşeron-Xızı","Dağlıq Şirvan","Gəncə-Daşkəsən","Qarabağ","Qazax-Tovuz","Quba-Xaçmaz","Lənkəran-Astara","Mərkəzi Aran","Mil-Muğan","Naxçıvan","Şəki-Zaqatala","Şərqi Zəngəzur","Şirvan-Salyan"];
+const ORIGINS = [["tectonic","Тектоническое","Tektonik"],["glacial","Ледниковое (каровое)","Buzlaq (kar)"],["dammed","Завальное (подпрудное)","Uçqun-bənd"],["karst","Карстовое","Karst"],["volcanic","Вулканическое / грязевулк.","Vulkanik / palçıq vulkanı"],["lagoon","Лагунное (реликт Каспия)","Laqun (Xəzər reliktı)"],["floodplain","Пойменное / старица","Çaybasar / köhnə məcra"],["aeolian","Дефляционное","Deflyasiya"],["artificial","Искусственное (водохр., пруд)","Süni (su anbarı, gölməçə)"],["other","Иное","Digər"]];
+const REGIME = [["open","Сточное","Axarlı"],["closed","Бессточное","Axarsız"],["seasonal","Пересыхающее","Quruyan"]];
+const FEED = [["rain","Дождевое","Yağış"],["snow","Снеговое / ледниковое","Qar / buzlaq"],["ground","Подземное","Yeraltı"],["river","Речное","Çay"],["mixed","Смешанное","Qarışıq"],["anthrop","Сбросные воды","Tullantı suları"]];
+const SALIN = [["fresh","Пресное (<1 г/л)","Şirin (<1 q/l)"],["brackish","Солоноватое (1–25 г/л)","Acı-şor (1–25 q/l)"],["saline","Солёное (25–50 г/л)","Şor (25–50 q/l)"],["brine","Рассол (>50 г/л)","Duzlu (>50 q/l)"]];
+const STATUS = [["good","Хорошее","Yaxşı","good"],["fair","Удовлетворительное","Kafi","warn"],["poor","Плохое","Pis","bad"],["critical","Критическое","Kritik","crit"]];
+const OBS = [["level","oLevel"],["area","oArea"],["depth","oDepth"],["mineral","oMin"],["temp","oTemp"],["ph","oPh"]];
+
+/* field: [key, ru, az, type, group, opts|unit] */
+const F = [
+ ["name","Название","Adı","text","id"],
+ ["name_ru","Название (рус.)","Rusca adı","text","id"],
+ ["code","Инвентарный номер","İnventar nömrəsi","text","id"],
+ ["region","Экономический район","İqtisadi rayon","region","loc"],
+ ["district","Административный район","İnzibati rayon","text","loc"],
+ ["lat","Широта, °","En dairəsi, °","num","loc"],
+ ["lon","Долгота, °","Uzunluq dairəsi, °","num","loc"],
+ ["alt","Высота уреза, м абс.","Su səthinin hündürlüyü, m","num","loc"],
+ ["area","Площадь зеркала, км²","Su güzgüsünün sahəsi, km²","num","morph"],
+ ["shore","Длина береговой линии, км","Sahil xəttinin uzunluğu, km","num","morph"],
+ ["length","Длина озера, км","Gölün uzunluğu, km","num","morph"],
+ ["width","Макс. ширина, км","Maks. eni, km","num","morph"],
+ ["max_depth","Макс. глубина, м","Maks. dərinlik, m","num","morph"],
+ ["mean_depth","Средняя глубина, м","Orta dərinlik, m","num","morph"],
+ ["volume","Объём воды, млн м³","Su həcmi, mln m³","num","morph"],
+ ["catchment","Площадь водосбора, км²","Su toplayıcı hövzənin sahəsi, km²","num","morph"],
+ ["origin","Генезис котловины","Çökəkliyin mənşəyi","sel:ORIGINS","hydro"],
+ ["regime","Водообмен","Su mübadiləsi","sel:REGIME","hydro"],
+ ["feeding","Тип питания","Qidalanma tipi","sel:FEED","hydro"],
+ ["salinity","Класс солёности","Duzluluq sinfi","sel:SALIN","hydro"],
+ ["mineral","Минерализация, г/л","Minerallaşma, q/l","num","hydro"],
+ ["status","Экологическое состояние","Ekoloji vəziyyət","sel:STATUS","eco"],
+ ["protect","Охраняемая территория","Mühafizə olunan ərazi","text","eco"],
+ ["uses","Использование","İstifadə","area","eco"],
+ ["threats","Угрозы и нагрузки","Təhdidlər və təsirlər","area","eco"],
+ ["sources","Источники, литература","Mənbələr, ədəbiyyat","area","src"],
+ ["notes","Примечания","Qeydlər","area","src"],
+];
+const LISTS = {ORIGINS,REGIME,FEED,SALIN,STATUS};
+const GROUPS = [["id","gId"],["loc","gLoc"],["morph","gMorph"],["hydro","gHydro"],["eco","gEco"],["src","gSrc"]];
+const FILL_KEYS = ["name","region","district","lat","alt","area","max_depth","mean_depth","volume","catchment","origin","regime","feeding","salinity","mineral","status"];
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const num = (v, d=2) => (v===null||v===undefined||v===""||isNaN(+v)) ? "—" : (+v).toLocaleString(lang==='ru'?'ru-RU':'az-Latn-AZ',{maximumFractionDigits:d});
+const fmtDate = s => { if(!s) return "—"; const d=new Date(s); return isNaN(d)?esc(s):(lang==='ru'?d.toLocaleDateString('ru-RU',{year:'numeric',month:'short',day:'numeric'}):d.toLocaleDateString('ru-RU',{year:'numeric',month:'2-digit',day:'2-digit'})); };
+const optLabel = (list, key) => { const o=(LISTS[list]||[]).find(x=>x[0]===key); return o?lbl(o):(key||"—"); };
+function toast(msg, ms=2600){ const el=$("#toast"); el.textContent=msg; el.style.display="block"; clearTimeout(toast._t); toast._t=setTimeout(()=>el.style.display="none",ms); }
+function completeness(l){ let n=0; for(const k of FILL_KEYS){ const v=l[k]; if(v!==undefined&&v!==null&&v!=="") n++; } return Math.round(100*n/FILL_KEYS.length); }
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const ls = { get(k){try{return localStorage.getItem(k)}catch(e){return null}}, set(k,v){try{localStorage.setItem(k,v)}catch(e){}} };
+const round6 = g => Array.isArray(g) ? (typeof g[0]==="number" ? [Math.round(g[0]*1e6)/1e6, Math.round(g[1]*1e6)/1e6] : g.map(round6)) : g;
+
+/* ---------- Supabase ---------- */
+const COLS = F.map(f=>f[0]).concat(["attrs","geojson","demo"]);
+let sb = null, me = null, myRole = null, canWrite = false, isAdmin = false;
+const lakes = new Map();          // id -> row (+ hasGeom)
+const geoms = new Map();          // id -> {geometry}
+let selId = null, tab = "pass", editing = false;
+let obsRows = [], photoRows = [], members = [];
+const memberName = email => { const m = members.find(x=>x.email===email); return (m && m.full_name) || email || ""; };
+function cfg(){ return { url: SUPABASE_URL || ls.get("lakes-sb-url") || "", key: SUPABASE_ANON_KEY || ls.get("lakes-sb-key") || "" }; }
+function clean(o){ const r={}; for(const k of Object.keys(o)) if(COLS.includes(k)) r[k] = (o[k]==="" ? null : o[k]); return r; }
+function chk(res){ if(res.error) throw res.error; return res.data; }
+
+/* ---------- map ---------- */
+const map = L.map("map", {zoomControl:true, attributionControl:true, doubleClickZoom:true}).setView([40.3, 47.7], 7);
+L.control.scale({imperial:false, position:"bottomright"}).addTo(map);
+map.attributionControl.setPrefix(false);
+const BASEMAPS = {
+  osm: L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {maxZoom:19, attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}),
+  sat: L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}", {maxZoom:19, attribution:'Esri, Maxar, Earthstar Geographics'}),
+  topo: L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png", {maxZoom:17, attribution:'&copy; OpenStreetMap, SRTM | <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)'}),
+};
+let baseCtl = null, curBase = ls.get("lakes-base") || "osm";
+(BASEMAPS[curBase] || BASEMAPS.osm).addTo(map);
+map.on("baselayerchange", e=>{ for(const [k,v] of Object.entries(BASEMAPS)) if(v===e.layer) ls.set("lakes-base",k); });
+function drawBase(){
+  if(baseCtl) baseCtl.remove();
+  baseCtl = L.control.layers({[t("bmOsm")]:BASEMAPS.osm, [t("bmSat")]:BASEMAPS.sat, [t("bmTopo")]:BASEMAPS.topo}, null, {position:"bottomleft"}).addTo(map);
+}
+drawBase();
+const lakeLayer = L.layerGroup().addTo(map);
+const markers = new Map();
+function lakeStyle(id){ const s=id===selId; return {color: s?css("--lake-sel"):css("--lake"), weight: s?2.4:1.2, fillColor: css("--lake"), fillOpacity: s?0.55:0.4}; }
+function renderLayer(){
+  lakeLayer.clearLayers(); markers.clear();
+  for(const l of filtered()){
+    const g = geoms.get(l.id);
+    let lay;
+    if(g && g.geometry){
+      lay = L.geoJSON({type:"Feature",geometry:g.geometry}, {style:()=>lakeStyle(l.id)});
+      // keep a visible point at small scales
+      const z = map.getZoom();
+      if(z < 10 && l.lat!=null) { const pt = L.circleMarker([l.lat,l.lon],{radius:4,...lakeStyle(l.id),fillOpacity:.9}); lay = L.featureGroup([lay, pt]); }
+    } else if(isFinite(+l.lat) && isFinite(+l.lon) && l.lat!==null && l.lat!=="") {
+      lay = L.circleMarker([+l.lat,+l.lon], {radius:6, ...lakeStyle(l.id), fillOpacity:.85});
+    }
+    if(!lay) continue;
+    lay.bindTooltip(esc(l.name||t("newName")), {direction:"top", sticky:true});
+    lay.on("click", (e)=>{ if(mode) return; L.DomEvent.stopPropagation(e); select(l.id); });
+    lay.addTo(lakeLayer); markers.set(l.id, lay);
+  }
+}
+map.on("zoomend", ()=>renderLayer());
+map.on("mousemove", e=>{ $("#coords").textContent = `${e.latlng.lat.toFixed(5)}° N  ${e.latlng.lng.toFixed(5)}° E`; });
+function restyleTheme(){ renderLayer(); if(measureLine) measureLine.setStyle({color:css("--lake-sel")}); }
+new MutationObserver(restyleTheme).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+try{ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", restyleTheme); }catch(e){}
+
+/* ---------- modes: place point, measure ---------- */
+let mode = null, placeCb = null, measurePts = [], measureLine = null;
+function setHint(s){ const h=$("#hint"); h.textContent=s||""; h.style.display=s?"block":"none"; }
+function startPlace(cb){ mode="place"; placeCb=cb; setHint(t("clickMap")); map.getContainer().style.cursor="crosshair"; }
+function endMode(){ mode=null; placeCb=null; setHint(""); map.getContainer().style.cursor=""; $("#btn-measure").setAttribute("aria-pressed","false"); map.doubleClickZoom.enable(); }
+function resetMeasure(){ measurePts=[]; if(measureLine){ measureLine.remove(); measureLine=null; } $("#measure").style.display="none"; }
+map.on("click", e=>{
+  if(mode==="place"){ const cb=placeCb; endMode(); cb && cb(e.latlng); return; }
+  if(mode==="measure"){ measurePts.push([e.latlng.lng, e.latlng.lat]); updateMeasure(); }
+});
+map.on("dblclick", e=>{ if(mode==="measure"){ endMode(); } });
+function updateMeasure(){
+  if(measureLine) measureLine.remove();
+  const ll = measurePts.map(p=>[p[1],p[0]]);
+  measureLine = measurePts.length>=3 ? L.polygon(ll,{color:css("--lake-sel"),weight:2,dashArray:"5 4",fillOpacity:.08}) : L.polyline(ll,{color:css("--lake-sel"),weight:2,dashArray:"5 4"});
+  measureLine.addTo(map);
+  const el=$("#measure"); el.style.display="block";
+  let s = "";
+  if(measurePts.length>=2){ const len = turf.length(turf.lineString(measurePts),{units:"kilometers"}); s += `${t("dist")}: <b>${num(len,3)} ${t("km")}</b>`; }
+  if(measurePts.length>=3){ const a = turf.area(turf.polygon([[...measurePts, measurePts[0]]]))/1e6; s += ` · ${t("area")}: <b>${num(a,4)} ${t("km2")}</b>`; }
+  el.innerHTML = s || "…";
+}
+$("#btn-measure").onclick = ()=>{
+  if(mode==="measure"){ endMode(); resetMeasure(); return; }
+  endMode(); resetMeasure(); mode="measure"; map.doubleClickZoom.disable();
+  $("#btn-measure").setAttribute("aria-pressed","true"); setHint(t("measHint")); map.getContainer().style.cursor="crosshair";
+};
+document.addEventListener("keydown", e=>{ if(e.key==="Escape"){ if(mode){ endMode(); resetMeasure(); } else if($("#modal").classList.contains("open")) closeModal(); } });
+
+/* ---------- catalog list ---------- */
+function fillSelects(){
+  const r=$("#f-region"), o=$("#f-origin"), s=$("#f-sort");
+  const rv=r.value, ov=o.value, sv=s.value||"name";
+  r.innerHTML = `<option value="">${esc(t("allRegions"))}</option>` + REGIONS.map(x=>`<option>${esc(x)}</option>`).join("");
+  o.innerHTML = `<option value="">${esc(t("allOrigins"))}</option>` + ORIGINS.map(x=>`<option value="${x[0]}">${esc(lbl(x))}</option>`).join("");
+  s.innerHTML = [["name","sortName"],["area","sortArea"],["fill","sortFill"],["upd","sortUpd"]].map(x=>`<option value="${x[0]}">${esc(t(x[1]))}</option>`).join("");
+  r.value=rv; o.value=ov; s.value=sv;
+}
+function filtered(){
+  const q = $("#q").value.trim().toLowerCase(), rg=$("#f-region").value, og=$("#f-origin").value;
+  let arr = [...lakes.values()].filter(l=>{
+    if(rg && l.region!==rg) return false;
+    if(og && l.origin!==og) return false;
+    if(q){ const h=[l.name,l.name_ru,l.code,l.district,l.region].join(" ").toLowerCase(); if(!h.includes(q)) return false; }
+    return true;
+  });
+  const s=$("#f-sort").value||"name", loc=lang==='ru'?'ru':'az';
+  arr.sort((a,b)=> s==="area" ? (+b.area||0)-(+a.area||0) : s==="fill" ? completeness(b)-completeness(a) : s==="upd" ? String(b.updated_at||"").localeCompare(String(a.updated_at||"")) : String(a.name||"").localeCompare(String(b.name||""),loc));
+  return arr;
+}
+function renderList(){
+  const arr = filtered(), el=$("#list");
+  if(!lakes.size){ el.innerHTML = `<div class="empty">${esc(t("noLakes"))}</div>`; }
+  else if(!arr.length){ el.innerHTML = `<div class="empty">${esc(t("noMatch"))}</div>`; }
+  else el.innerHTML = arr.map(l=>{
+    const c = completeness(l), st = STATUS.find(x=>x[0]===l.status);
+    return `<div class="item${l.id===selId?" sel":""}" data-id="${esc(l.id)}" tabindex="0" role="button">
+      <div class="nm">${esc(l.name||t("newName"))} ${l.demo?`<span class="chip demo">${esc(t("demo"))}</span>`:""}</div>
+      <div class="ar">${l.area!==undefined&&l.area!==""&&l.area!==null?`<b>${num(l.area,3)}</b>${t("km2")}`:""}</div>
+      <div class="meta">${esc([l.region,l.district].filter(Boolean).join(" · ")||"—")}${st?` · <span class="chip ${st[3]}">${esc(lbl(st))}</span>`:""}</div>
+      <div class="bar" title="${esc(t("completeness"))}: ${c}%"><i style="width:${c}%"></i></div>
+    </div>`;
+  }).join("");
+  // tiles
+  const all=[...lakes.values()];
+  $("#s-n").textContent = all.length;
+  const tot = all.reduce((s,l)=>s+(+l.area||0),0);
+  $("#s-a").textContent = tot ? num(tot,1) : "—";
+  $("#s-g").textContent = all.filter(l=>l.hasGeom).length;
+  $("#s-c").textContent = all.length ? Math.round(all.reduce((s,l)=>s+completeness(l),0)/all.length)+"%" : "—";
+}
+$("#list").addEventListener("click", e=>{ const it=e.target.closest(".item"); if(it){ select(it.dataset.id, true); if(innerWidth<=820) $("#rail").classList.remove("open"); } });
+$("#list").addEventListener("keydown", e=>{ if(e.key==="Enter"){ const it=e.target.closest(".item"); if(it) select(it.dataset.id,true); } });
+["#q","#f-region","#f-origin","#f-sort"].forEach(s=>$(s).addEventListener("input", ()=>{ renderList(); renderLayer(); }));
+$("#railToggle").onclick = ()=>$("#rail").classList.toggle("open");
+$("#btn-fit").onclick = ()=>fitAll();
+function fitAll(){ const fg=L.featureGroup([...markers.values()]); if(fg.getLayers().length) map.fitBounds(fg.getBounds().pad(0.15),{maxZoom:11}); else map.setView([40.3,47.7],7); }
+
+/* ---------- selection & drawer ---------- */
+function select(id, fly){
+  if(selId!==id){ editing=false; }
+  selId = id; location.hash = id ? "lake-"+id : "";
+  renderList(); renderLayer();
+  if(!id){ $("#drawer").classList.remove("open"); subscribeDetail(null); return; }
+  $("#drawer").classList.add("open");
+  subscribeDetail(id);
+  renderDrawer();
+  if(fly){ const m=markers.get(id); if(m){ if(m.getBounds){ map.fitBounds(m.getBounds().pad(0.6),{maxZoom:14}); } else map.setView(m.getLatLng(), Math.max(map.getZoom(),11)); } }
+}
+$("#d-close").onclick = ()=>select(null);
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>{ tab=b.dataset.tab; editing=false; renderDrawer(); });
+let detailToken = 0;
+async function subscribeDetail(id){
+  obsRows=[]; photoRows=[];
+  if(!id || !sb) return;
+  const tok = ++detailToken;
+  await Promise.all([loadObs(id, tok), loadPhotos(id, tok)]);
+}
+async function loadObs(id, tok){
+  try{ const rows = chk(await sb.from("lake_obs").select("*").eq("lake_id", id).order("date"));
+    if(tok!==undefined && tok!==detailToken) return; if(selId!==id) return;
+    obsRows = rows; if(tab==="obs" && !editing) renderDrawer(); updIds();
+  }catch(err){ failMsg(err); }
+}
+async function loadPhotos(id, tok){
+  try{ const rows = chk(await sb.from("lake_photos").select("*").eq("lake_id", id).order("created_at"));
+    if(rows.length){ const urls = chk(await sb.storage.from("lake-photos").createSignedUrls(rows.map(r=>r.path), 3600));
+      rows.forEach((r,i)=>{ r.data = urls[i] && urls[i].signedUrl; r.at = r.created_at; }); }
+    if(tok!==undefined && tok!==detailToken) return; if(selId!==id) return;
+    photoRows = rows; if(tab==="photo") renderDrawer();
+  }catch(err){ failMsg(err); }
+}
+function updIds(){
+  const l=lakes.get(selId); if(!l) return;
+  const who = memberName(l.updated_by_email);
+  $("#d-ids").innerHTML = [
+    l.code?`<span class="chip">№ ${esc(l.code)}</span>`:"",
+    l.region?`<span>${esc(l.region)}</span>`:"",
+    `<span>${esc(t("completeness"))}: <b>${completeness(l)}%</b></span>`,
+    obsRows.length?`<span>${obsRows.length} ${esc(t("nObs"))}</span>`:"",
+    l.updated_at?`<span>${esc(t("upd"))}: ${fmtDate(l.updated_at)}${who?" · "+esc(who):""}</span>`:"",
+  ].filter(Boolean).join(" ");
+}
+function renderDrawer(){
+  const l = lakes.get(selId); if(!l){ $("#drawer").classList.remove("open"); return; }
+  $("#d-title").textContent = l.name || t("newName");
+  document.querySelectorAll(".tabs button").forEach(b=>b.setAttribute("aria-selected", String(b.dataset.tab===tab)));
+  updIds();
+  const body=$("#d-body");
+  if(tab==="pass") body.innerHTML = editing ? passForm(l) : passView(l);
+  else if(tab==="morph") body.innerHTML = morphView(l);
+  else if(tab==="obs") body.innerHTML = obsView(l);
+  else if(tab==="photo") body.innerHTML = photoView(l);
+  else body.innerHTML = expView(l);
+  wireDrawer(l);
+}
+function fieldValue(f, v){
+  if(v===undefined||v===null||v==="") return null;
+  const [k,,,type]=f;
+  if(type==="num") return num(v, (k==="lat"||k==="lon")?5:3);
+  if(type.startsWith("sel:")){ const list=type.slice(4); if(list==="STATUS"){ const s=STATUS.find(x=>x[0]===v); return s?`<span class="chip ${s[3]}">${esc(lbl(s))}</span>`:esc(v); } return esc(optLabel(list, v)); }
+  return esc(v).replace(/\n/g,"<br>");
+}
+function passView(l){
+  let h = l.demo ? `<div class="warnbox">${esc(t("demoNote"))}</div>` : "";
+  for(const [g,gk] of GROUPS){
+    h += `<div class="sec"><h3>${esc(t(gk))}</h3><dl class="kv">`;
+    for(const f of F.filter(f=>f[4]===g)){ const v=fieldValue(f,l[f[0]]); h += `<dt>${esc(lang==='ru'?f[1]:f[2])}</dt><dd class="${v===null?"na":""}">${v===null?"—":v}</dd>`; }
+    h += `</dl></div>`;
+  }
+  if(l.attrs && Object.keys(l.attrs).length){
+    h += `<div class="sec"><h3>${esc(t("gAttrs"))}</h3><dl class="kv">` + Object.entries(l.attrs).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("") + `</dl></div>`;
+  }
+  h += `<div class="actions">${canWrite?`<button class="btn pri" data-act="edit">${esc(t("edit"))}</button><button class="btn" data-act="pick">${esc(t("pickPoint"))}</button><button class="btn" data-act="geom">${esc(t("replaceGeom"))}</button><button class="btn danger" data-act="del">${esc(t("del"))}</button>`:`<span class="note">${esc(t("readOnly"))}</span>`}</div>`;
+  return h;
+}
+function input(f, v){
+  const [k,ru,az,type]=f, id="fld-"+k, lab=esc(lang==='ru'?ru:az);
+  v = v ?? "";
+  if(type==="area") return `<label class="full" for="${id}">${lab}<textarea id="${id}" name="${k}">${esc(v)}</textarea></label>`;
+  if(type==="region") return `<label for="${id}">${lab}<select id="${id}" name="${k}"><option value="">—</option>${REGIONS.map(r=>`<option${r===v?" selected":""}>${esc(r)}</option>`).join("")}</select></label>`;
+  if(type.startsWith("sel:")){ const list=LISTS[type.slice(4)]; return `<label for="${id}">${lab}<select id="${id}" name="${k}"><option value="">—</option>${list.map(o=>`<option value="${o[0]}"${o[0]===v?" selected":""}>${esc(lbl(o))}</option>`).join("")}</select></label>`; }
+  if(type==="num") return `<label for="${id}">${lab}<input type="number" step="any" id="${id}" name="${k}" value="${esc(v)}"></label>`;
+  return `<label for="${id}"${k==="name"?' class="full"':""}>${lab}<input type="text" id="${id}" name="${k}" value="${esc(v)}"></label>`;
+}
+function passForm(l){
+  let h = `<form id="pform">`;
+  for(const [g,gk] of GROUPS){ h += `<div class="sec"><h3>${esc(t(gk))}</h3><div class="form">${F.filter(f=>f[4]===g).map(f=>input(f,l[f[0]])).join("")}</div></div>`; }
+  h += `<div class="actions"><button class="btn pri" type="submit">${esc(t("save"))}</button><button class="btn" type="button" data-act="cancel">${esc(t("cancel"))}</button></div></form>`;
+  return h;
+}
+function morphCalc(id){
+  const g = geoms.get(id); if(!g || !g.geometry) return null;
+  const feat = {type:"Feature", properties:{}, geometry:g.geometry};
+  const A = turf.area(feat)/1e6;
+  let P = 0; try{ const ln = turf.polygonToLine(feat); P = turf.length(ln,{units:"kilometers"}); }catch(e){}
+  const Ks = A>0 ? P/(2*Math.sqrt(Math.PI*A)) : null;
+  const c = turf.centroid(feat).geometry.coordinates;
+  const bb = turf.bbox(feat);
+  const ew = turf.distance([bb[0],(bb[1]+bb[3])/2],[bb[2],(bb[1]+bb[3])/2]), ns = turf.distance([(bb[0]+bb[2])/2,bb[1]],[(bb[0]+bb[2])/2,bb[3]]);
+  const parts = g.geometry.type==="MultiPolygon" ? g.geometry.coordinates.length : 1;
+  return {A,P,Ks,c,len:Math.max(ew,ns),wid:Math.min(ew,ns),parts};
+}
+function morphView(l){
+  const m = morphCalc(l.id);
+  if(!m) return `<p class="note">${esc(t("noGeom"))}</p>${canWrite?`<div class="actions"><button class="btn pri" data-act="geom">${esc(t("replaceGeom"))}</button></div>`:""}`;
+  return `<div class="sec"><dl class="kv">
+    <dt>${esc(t("mArea"))}</dt><dd><b>${num(m.A,4)}</b> ${t("km2")}</dd>
+    <dt>${esc(t("mPer"))}</dt><dd>${num(m.P,3)} ${t("km")}</dd>
+    <dt>${esc(t("mKs"))}</dt><dd>${num(m.Ks,3)}</dd>
+    <dt>${esc(t("mBbox"))}</dt><dd>${num(m.len,3)} × ${num(m.wid,3)} ${t("km")}</dd>
+    <dt>${esc(t("mCen"))}</dt><dd>${m.c[1].toFixed(5)}° N, ${m.c[0].toFixed(5)}° E</dd>
+    <dt>${esc(t("mParts"))}</dt><dd>${m.parts}</dd>
+  </dl></div><p class="note">${esc(t("mFrom"))}</p>
+  ${canWrite?`<div class="actions"><button class="btn pri" data-act="tomorph">${esc(t("toPass"))}</button><button class="btn" data-act="geom">${esc(t("replaceGeom"))}</button></div>`:""}`;
+}
+let chartParam = "level";
+function chartSVG(rows, key){
+  const pts = rows.filter(r=>r[key]!==undefined&&r[key]!==null&&r[key]!==""&&r.date).map(r=>({x:new Date(r.date).getTime(), y:+r[key], d:r.date})).filter(p=>isFinite(p.x)&&isFinite(p.y));
+  if(pts.length<1) return `<p class="note">—</p>`;
+  const W=420,H=170,pl=44,pr=12,pt=12,pb=26;
+  let x0=Math.min(...pts.map(p=>p.x)), x1=Math.max(...pts.map(p=>p.x)); if(x0===x1){x0-=864e5*30;x1+=864e5*30;}
+  let y0=Math.min(...pts.map(p=>p.y)), y1=Math.max(...pts.map(p=>p.y)); if(y0===y1){y0-=1;y1+=1;} const pad=(y1-y0)*0.12; y0-=pad; y1+=pad;
+  const X=v=>pl+(v-x0)/(x1-x0)*(W-pl-pr), Y=v=>pt+(1-(v-y0)/(y1-y0))*(H-pt-pb);
+  const ticks=4, grid=[]; for(let i=0;i<=ticks;i++){ const v=y0+(y1-y0)*i/ticks; grid.push(`<line x1="${pl}" x2="${W-pr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--line)" stroke-width="1"/><text x="${pl-6}" y="${Y(v)+4}" text-anchor="end" font-size="10" fill="var(--muted)">${num(v,2)}</text>`); }
+  const line = pts.map((p,i)=>`${i?"L":"M"}${X(p.x).toFixed(1)},${Y(p.y).toFixed(1)}`).join("");
+  const areaP = line + `L${X(pts[pts.length-1].x).toFixed(1)},${H-pb}L${X(pts[0].x).toFixed(1)},${H-pb}Z`;
+  const last=pts[pts.length-1];
+  const yrs = [new Date(x0), new Date(x1)].map(d=>d.getFullYear()===new Date(x1).getFullYear()&&x1-x0<3e10 ? d.toLocaleDateString(lang==='ru'?'ru-RU':'az-Latn-AZ',{month:'short',year:'2-digit'}) : d.getFullYear());
+  return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="chart">${grid.join("")}
+    <path d="${areaP}" fill="var(--accent)" opacity=".12"/><path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2"/>
+    ${pts.map(p=>`<circle cx="${X(p.x)}" cy="${Y(p.y)}" r="2.5" fill="var(--accent)"><title>${esc(p.d)}: ${p.y}</title></circle>`).join("")}
+    <circle cx="${X(last.x)}" cy="${Y(last.y)}" r="5" fill="var(--surface)" stroke="var(--accent)" stroke-width="2.5"/>
+    <text x="${pl}" y="${H-8}" font-size="10" fill="var(--muted)">${yrs[0]}</text><text x="${W-pr}" y="${H-8}" font-size="10" text-anchor="end" fill="var(--muted)">${yrs[1]}</text></svg>`;
+}
+function obsView(l){
+  let h = `<div class="sec"><div class="row" style="margin-bottom:8px"><label for="cparam" class="note" style="flex:none">${esc(t("param"))}</label><select id="cparam">${OBS.map(o=>`<option value="${o[0]}"${o[0]===chartParam?" selected":""}>${esc(t(o[1]))}</option>`).join("")}</select></div>${chartSVG(obsRows, chartParam)}</div>`;
+  if(!obsRows.length) h += `<p class="note">${esc(t("noObs"))}</p>`;
+  else h += `<div class="sec tw"><table class="t"><thead><tr><th>${esc(t("date"))}</th>${OBS.map(o=>`<th>${esc(t(o[1]))}</th>`).join("")}<th>${esc(t("source"))}</th><th></th></tr></thead><tbody>${
+    [...obsRows].reverse().map(r=>`<tr><td>${esc(r.date)}</td>${OBS.map(o=>`<td>${num(r[o[0]],3)}</td>`).join("")}<td style="text-align:left">${esc(r.source||"")}${r.note?` <span class="note" title="${esc(r.note)}">ⓘ</span>`:""}</td><td>${canWrite?`<button class="btn ghost sm" data-delobs="${esc(r.id)}" aria-label="delete">✕</button>`:""}</td></tr>`).join("")}</tbody></table></div>`;
+  if(canWrite) h += `<div class="sec"><h3>${esc(t("addObs"))}</h3><form id="oform" class="form">
+    <label for="o-date">${esc(t("date"))}<input type="date" id="o-date" name="date" required value="${new Date().toISOString().slice(0,10)}"></label>
+    ${OBS.map(o=>`<label for="o-${o[0]}">${esc(t(o[1]))}<input type="number" step="any" id="o-${o[0]}" name="${o[0]}"></label>`).join("")}
+    <label for="o-source">${esc(t("source"))}<input type="text" id="o-source" name="source" placeholder="Sentinel-2, polevoe…"></label>
+    <label class="full" for="o-note">${esc(t("note"))}<input type="text" id="o-note" name="note"></label>
+    <div class="full actions" style="grid-column:1/-1;margin:0"><button class="btn pri" type="submit">${esc(t("addObs"))}</button></div></form></div>`;
+  return h;
+}
+function photoView(l){
+  let h = photoRows.length ? `<div class="photos">${photoRows.map(p=>`<figure><img src="${esc(p.data)}" alt="${esc(p.caption||l.name)}" data-big="${esc(p.id)}">${canWrite?`<button class="x" data-delph="${esc(p.id)}" aria-label="delete">✕</button>`:""}<figcaption>${esc(p.caption||"")} ${p.at?`· ${fmtDate(p.at)}`:""}</figcaption></figure>`).join("")}</div>` : `<p class="note">${esc(t("noPhoto"))}</p>`;
+  if(canWrite) h += `<div class="actions"><input type="text" id="ph-cap" placeholder="${esc(t("caption"))}" style="flex:1"><button class="btn pri" data-act="photo">${esc(t("addPhoto"))}</button></div>`;
+  return h;
+}
+function expView(l){
+  return `<div class="sec"><h3>${esc(t("expLake"))}</h3><div class="actions"><button class="btn pri" data-exp="print">${esc(t("expPrint"))}</button><button class="btn" data-exp="html">${esc(t("expHtml"))}</button><button class="btn" data-exp="geo">${esc(t("expGeo"))}</button><button class="btn" data-exp="obs">${esc(t("expObs"))}</button></div><p class="note">${esc(t("expHint"))}</p></div>
+  <div class="sec"><h3>${esc(t("expAll"))}</h3><div class="actions"><button class="btn" data-exp="csv">${esc(t("expCsv"))}</button><button class="btn" data-exp="geoall">${esc(t("expGeoAll"))}</button></div></div>`;
+}
+function wireDrawer(l){
+  const body=$("#d-body");
+  body.querySelectorAll("[data-act]").forEach(b=>b.onclick=async()=>{
+    const a=b.dataset.act;
+    if(a==="edit"){ editing=true; renderDrawer(); }
+    else if(a==="cancel"){ editing=false; renderDrawer(); }
+    else if(a==="del"){ confirmBox(t("confirmDel"), ()=>deleteLake(l.id)); }
+    else if(a==="pick"){ startPlace(ll=>saveLake(l.id,{lat:+ll.lat.toFixed(6),lon:+ll.lng.toFixed(6)})); }
+    else if(a==="geom"){ openImport(l.id); }
+    else if(a==="tomorph"){ const m=morphCalc(l.id); if(m){ await saveLake(l.id,{area:+m.A.toFixed(4),shore:+m.P.toFixed(3),length:+m.len.toFixed(3),width:+m.wid.toFixed(3),lat:+m.c[1].toFixed(6),lon:+m.c[0].toFixed(6)}); toast(t("moved")); } }
+    else if(a==="photo"){ $("#photoIn").click(); }
+  });
+  const pf=$("#pform"); if(pf) pf.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(pf), upd={};
+    for(const f of F){ let v=fd.get(f[0]); if(v===null) continue; v=String(v).trim(); if(f[3]==="num") v = v===""?"":+v; if((l[f[0]]??"")!==v) upd[f[0]]=v; }
+    if(!upd.name && !l.name && !fd.get("name")) upd.name=t("newName");
+    if(await saveLake(l.id, upd)){ editing=false; renderDrawer(); toast(t("saved")); } };
+  const of=$("#oform"); if(of) of.onsubmit=async e=>{ e.preventDefault(); const fd=new FormData(of), row={lake_id:l.id, date:fd.get("date"), source:String(fd.get("source")||"").trim()||null, note:String(fd.get("note")||"").trim()||null};
+    let any=false; for(const [k] of OBS){ const v=fd.get(k); if(v!==""&&v!==null){ row[k]=+v; any=true; } }
+    if(!any) return; try{ chk(await sb.from("lake_obs").insert(row)); toast(t("saved")); loadObs(l.id); }catch(err){ failMsg(err); } };
+  const cp=$("#cparam"); if(cp) cp.onchange=()=>{ chartParam=cp.value; renderDrawer(); };
+  body.querySelectorAll("[data-delobs]").forEach(b=>b.onclick=async()=>{ try{ chk(await sb.from("lake_obs").delete().eq("id", b.dataset.delobs)); loadObs(l.id); }catch(err){ failMsg(err); } });
+  body.querySelectorAll("[data-delph]").forEach(b=>b.onclick=()=>confirmBox(t("del")+"?", async()=>{ try{ const p=photoRows.find(x=>x.id===b.dataset.delph); if(p) await sb.storage.from("lake-photos").remove([p.path]); chk(await sb.from("lake_photos").delete().eq("id", b.dataset.delph)); loadPhotos(l.id); }catch(err){ failMsg(err); } }));
+  body.querySelectorAll("[data-big]").forEach(img=>img.onclick=()=>{ const p=photoRows.find(x=>x.id===img.dataset.big); if(p) openModal(`<img class="big" src="${esc(p.data)}" alt=""><p class="note">${esc(p.caption||"")}</p><div class="actions"><button class="btn" data-close>${esc(t("close"))}</button></div>`); });
+  body.querySelectorAll("[data-exp]").forEach(b=>b.onclick=()=>doExport(b.dataset.exp, l));
+}
+
+/* ---------- writes ---------- */
+function failMsg(err){
+  const m = (err && (err.message||err.error_description)) || String(err);
+  if(/row-level security|permission denied|violates row-level/i.test(m)){ toast(t("readOnly"),4000); return; }
+  if(/JWT expired|not authenticated/i.test(m)){ toast(t("sessionExp"),5000); showLogin(); return; }
+  toast(t("errSave")+m, 6000);
+}
+async function saveLake(id, upd){
+  upd = clean(upd);
+  if(!Object.keys(upd).length) return true;
+  if(upd.name !== undefined || Object.keys(upd).length>2) upd.demo = false;
+  try{
+    const rows = chk(await sb.from("lakes").update(upd).eq("id", id).select());
+    if(!rows.length){ toast(t("readOnly"),4000); return false; }
+    setLake(rows[0]); renderList(); renderLayer(); return true;
+  }catch(err){ failMsg(err); return false; }
+}
+async function createLake(data){
+  const row = chk(await sb.from("lakes").insert(clean({name:t("newName"), ...data})).select().single());
+  setLake(row); renderList(); renderLayer();
+  return row.id;
+}
+async function putGeom(id, geometry){
+  let g = {type:geometry.type, coordinates:round6(geometry.coordinates)}, s = JSON.stringify(g), tol = 0.00001, simplified=false;
+  while(s.length > 4000000 && tol < 0.01){ g = turf.simplify({type:"Feature",properties:{},geometry:g},{tolerance:tol,highQuality:true}).geometry; s=JSON.stringify(g); tol*=2; simplified=true; }
+  return {geometry:g, simplified};
+}
+async function deleteLake(id){
+  try{
+    const ph = chk(await sb.from("lake_photos").select("path").eq("lake_id", id));
+    if(ph.length) await sb.storage.from("lake-photos").remove(ph.map(p=>p.path));
+    const rows = chk(await sb.from("lakes").delete().eq("id", id).select("id"));
+    if(!rows.length){ toast(t("readOnly"),4000); return; }
+    lakes.delete(id); geoms.delete(id); select(null); renderList(); renderLayer(); toast(t("deleted"));
+  }catch(err){ failMsg(err); }
+}
+$("#btn-new").onclick = ()=>{ if(!canWrite){ toast(t("readOnly")); return; } startPlace(async ll=>{ try{ const id=await createLake({lat:+ll.lat.toFixed(6),lon:+ll.lng.toFixed(6)}); tab="pass"; select(id); editing=true; renderDrawer(); }catch(err){ failMsg(err); } }); };
+
+/* photos */
+$("#photoIn").onchange = async e=>{
+  const files=[...e.target.files]; e.target.value=""; const id=selId; if(!id) return;
+  const cap = ($("#ph-cap")?.value||"").trim();
+  for(const f of files){
+    try{
+      const blob = await compressImage(f);
+      const path = `${id}/${crypto.randomUUID()}.jpg`;
+      chk(await sb.storage.from("lake-photos").upload(path, blob, {contentType:"image/jpeg"}));
+      chk(await sb.from("lake_photos").insert({lake_id:id, path, caption:cap||f.name.replace(/\.[^.]+$/,"")}));
+    }catch(err){ failMsg(err); }
+  }
+  loadPhotos(id);
+};
+function compressImage(file){
+  return new Promise((res,rej)=>{ const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{ let w=img.naturalWidth,h=img.naturalHeight; const max=2048; if(Math.max(w,h)>max){ const k=max/Math.max(w,h); w=Math.round(w*k); h=Math.round(h*k); }
+      const c=document.createElement("canvas"); c.width=w; c.height=h; c.getContext("2d").drawImage(img,0,0,w,h); URL.revokeObjectURL(url);
+      c.toBlob(b=>b?res(b):rej(new Error("image")), "image/jpeg", 0.85); };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("image")); }; img.src=url; });
+}
+
+/* ---------- modal ---------- */
+function openModal(html){ $("#mbox").innerHTML=html; $("#modal").classList.add("open"); $("#mbox").querySelectorAll("[data-close]").forEach(b=>b.onclick=closeModal); }
+function closeModal(){ $("#modal").classList.remove("open"); $("#mbox").innerHTML=""; }
+$("#modal").addEventListener("click", e=>{ if(e.target.id==="modal") closeModal(); });
+function confirmBox(msg, ok){ openModal(`<p>${esc(msg)}</p><div class="actions"><button class="btn danger" id="cf-ok">OK</button><button class="btn" data-close>${esc(t("cancel"))}</button></div>`); $("#cf-ok").onclick=()=>{ closeModal(); ok(); }; }
+
+/* ---------- import ---------- */
+let impTarget = null, impFC = null;
+$("#btn-import").onclick = ()=>{ if(!canWrite){ toast(t("readOnly")); return; } openImport(null); };
+function openImport(targetId){
+  impTarget = targetId; impFC = null;
+  const tl = targetId ? lakes.get(targetId) : null;
+  openModal(`<h3>${esc(tl ? t("impTarget")+": "+(tl.name||"") : t("impTitle"))}</h3>
+    <div class="drop" id="drop" tabindex="0" role="button">${esc(t("impDrop"))}</div><div id="impBody"></div>
+    <div class="actions"><button class="btn" data-close>${esc(t("cancel"))}</button></div>`);
+  const d=$("#drop");
+  d.onclick=()=>$("#fileIn").click(); d.onkeydown=e=>{ if(e.key==="Enter") $("#fileIn").click(); };
+  d.ondragover=e=>{e.preventDefault(); d.classList.add("over");}; d.ondragleave=()=>d.classList.remove("over");
+  d.ondrop=e=>{ e.preventDefault(); d.classList.remove("over"); if(e.dataTransfer.files[0]) readImport(e.dataTransfer.files[0]); };
+}
+$("#fileIn").onchange = e=>{ const f=e.target.files[0]; e.target.value=""; if(f) readImport(f); };
+async function readImport(file){
+  const ib=$("#impBody"); ib.innerHTML=`<p class="note">${esc(t("loading"))}</p>`;
+  try{
+    const ext = file.name.split(".").pop().toLowerCase(); let fc;
+    if(ext==="zip"){ let r = await shp(await file.arrayBuffer()); if(Array.isArray(r)) r={type:"FeatureCollection",features:r.flatMap(x=>x.features)}; fc=r; }
+    else if(ext==="kml"){ fc = toGeoJSON.kml(new DOMParser().parseFromString(await file.text(),"text/xml")); }
+    else if(ext==="csv"){ const p=Papa.parse(await file.text(),{header:true,skipEmptyLines:true,dynamicTyping:true}); const keys=p.meta.fields||[];
+      const la=keys.find(k=>/^(lat|latitude|y|enlik|en|широта)$/i.test(k)), lo=keys.find(k=>/^(lon|lng|long|longitude|x|uzunluq|долгота)$/i.test(k));
+      if(!la||!lo) throw new Error("CSV: lat/lon ?");
+      fc={type:"FeatureCollection",features:p.data.filter(r=>isFinite(r[la])&&isFinite(r[lo])).map(r=>({type:"Feature",properties:r,geometry:{type:"Point",coordinates:[+r[lo],+r[la]]}}))}; }
+    else { const j=JSON.parse(await file.text()); fc = j.type==="FeatureCollection"?j : j.type==="Feature"?{type:"FeatureCollection",features:[j]} : {type:"FeatureCollection",features:[{type:"Feature",properties:{},geometry:j}]}; }
+    fc.features = (fc.features||[]).filter(f=>f && f.geometry);
+    impFC = fc; renderImport();
+  }catch(err){ ib.innerHTML = `<p class="warnbox">${esc(t("impErr"))}: ${esc(err.message||err)}</p>`; }
+}
+function sampleCoord(fc){ for(const f of fc.features){ let c=f.geometry.coordinates; while(Array.isArray(c)&&Array.isArray(c[0])) c=c[0]; if(Array.isArray(c)&&typeof c[0]==="number") return c; } return null; }
+function reproject(fc, from){
+  const tr = proj4(from, "EPSG:4326");
+  const rp = c => typeof c[0]==="number" ? tr.forward([c[0],c[1]]) : c.map(rp);
+  return {type:"FeatureCollection", features: fc.features.map(f=>({...f, geometry:{type:f.geometry.type, coordinates: rp(f.geometry.coordinates)}}))};
+}
+proj4.defs("EPSG:32638","+proj=utm +zone=38 +datum=WGS84 +units=m +no_defs");
+proj4.defs("EPSG:32639","+proj=utm +zone=39 +datum=WGS84 +units=m +no_defs");
+proj4.defs("EPSG:28408","+proj=tmerc +lat_0=0 +lon_0=45 +k=1 +x_0=8500000 +y_0=0 +ellps=krass +towgs84=23.57,-140.95,-79.8,0,0.35,0.79,-0.22 +units=m +no_defs");
+proj4.defs("EPSG:28409","+proj=tmerc +lat_0=0 +lon_0=51 +k=1 +x_0=9500000 +y_0=0 +ellps=krass +towgs84=23.57,-140.95,-79.8,0,0.35,0.79,-0.22 +units=m +no_defs");
+const AUTOMAP = { name:/^(name|ad|adi|adı|gol|göl|lake|название|naz)/i, name_ru:/(name_ru|ru_name|rus)/i, code:/^(code|kod|id_?inv|inv|№|nomer)/i, region:/(region|iqt|econ)/i, district:/(district|rayon|raion)/i,
+  alt:/^(alt|elev|hund|height|h_abs|высот)/i, area:/^(area|sahe|sahə|area_km|s_km|площ)/i, max_depth:/(max_?dep|dmax|h_?max|maks)/i, mean_depth:/(mean_?dep|avg_?dep|dmean|h_?mean|orta)/i, volume:/^(vol|hecm|həcm|объ)/i, mineral:/(miner|tds|salin)/i };
+function renderImport(){
+  const fc=impFC, ib=$("#impBody");
+  const polys = fc.features.filter(f=>/Polygon/.test(f.geometry.type)), pts = fc.features.filter(f=>f.geometry.type==="Point");
+  const skip = fc.features.length - polys.length - pts.length;
+  const c = sampleCoord(fc), projected = c && (Math.abs(c[0])>180 || Math.abs(c[1])>90);
+  const keys = [...new Set(fc.features.flatMap(f=>Object.keys(f.properties||{})))];
+  let h = `<p>${esc(t("impFound"))}: <b>${fc.features.length}</b> · ${polys.length} ${esc(t("impPoly"))} · ${pts.length} ${esc(t("impPt"))}${skip?` · ${skip} ${esc(t("impSkip"))}`:""}</p>`;
+  if(projected) h += `<div class="warnbox">${esc(t("impCrs"))}<div class="row" style="margin-top:6px"><select id="imp-crs">
+    <option value="EPSG:32639">WGS 84 / UTM 39N (EPSG:32639)</option><option value="EPSG:32638">WGS 84 / UTM 38N (EPSG:32638)</option>
+    <option value="EPSG:28409">Pulkovo 1942 / GK zone 9 (EPSG:28409)</option><option value="EPSG:28408">Pulkovo 1942 / GK zone 8 (EPSG:28408)</option>
+    <option value="EPSG:3857">Web Mercator (EPSG:3857)</option></select><button class="btn" id="imp-rp">OK</button></div></div>`;
+  if(impTarget){
+    if(polys.length>1) h += `<p class="note">${esc(t("impOne"))}</p><select id="imp-one">${polys.map((f,i)=>`<option value="${i}">${i+1}. ${esc(Object.values(f.properties||{}).slice(0,2).join(" · "))}</option>`).join("")}</select>`;
+    h += `<div class="actions"><button class="btn pri" id="imp-go"${!polys.length||projected?" disabled":""}>${esc(t("replaceGeom"))}</button></div>`;
+  } else {
+    const mapF = F.filter(f=>AUTOMAP[f[0]]);
+    h += `<div class="sec"><h3>${esc(t("impMap"))}</h3><div class="form">${mapF.map(f=>{ const guess = keys.find(k=>k===f[0]) || keys.find(k=>AUTOMAP[f[0]].test(k)) || "";
+      return `<label for="map-${f[0]}">${esc(lang==='ru'?f[1]:f[2])}<select id="map-${f[0]}" data-map="${f[0]}"><option value="">${esc(t("impNone"))}</option>${keys.map(k=>`<option${k===guess?" selected":""}>${esc(k)}</option>`).join("")}</select></label>`; }).join("")}
+      <label class="full" for="imp-region">${esc(lang==='ru'?"Экономический район для всех (если не в атрибутах)":"Hamısı üçün iqtisadi rayon (atributlarda yoxdursa)")}<select id="imp-region"><option value="">—</option>${REGIONS.map(r=>`<option>${esc(r)}</option>`).join("")}</select></label>
+      <label class="full" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="imp-auto" checked> ${esc(t("impAutoArea"))}</label></div></div>
+      <div id="imp-prog"></div><div class="actions"><button class="btn pri" id="imp-go"${(!polys.length&&!pts.length)||projected?" disabled":""}>${esc(t("impGo"))} (${polys.length+pts.length})</button></div>`;
+  }
+  ib.innerHTML = h;
+  const rp=$("#imp-rp"); if(rp) rp.onclick=()=>{ try{ impFC = reproject(impFC, $("#imp-crs").value); renderImport(); }catch(err){ toast(t("impErr")+": "+err.message); } };
+  const go=$("#imp-go"); if(go) go.onclick=()=>runImport();
+}
+async function runImport(){
+  const fc=impFC, go=$("#imp-go"); go.disabled=true;
+  if(impTarget){
+    const polys = fc.features.filter(f=>/Polygon/.test(f.geometry.type)); const idx = +($("#imp-one")?.value||0); const f=polys[idx];
+    try{ const r = await putGeom(impTarget, f.geometry); const c=turf.centroid(f).geometry.coordinates;
+      const l=lakes.get(impTarget)||{}; const upd={geojson:r.geometry}; if(l.lat===undefined||l.lat===""||l.lat===null){ upd.lat=+c[1].toFixed(6); upd.lon=+c[0].toFixed(6); }
+      if(!(await saveLake(impTarget, upd))){ go.disabled=false; return; }
+      closeModal(); if(r.simplified) toast(t("tooBig")); else toast(t("saved")); tab="morph"; select(impTarget,true);
+    }catch(err){ failMsg(err); go.disabled=false; }
+    return;
+  }
+  const mapping = {}; document.querySelectorAll("[data-map]").forEach(s=>{ if(s.value) mapping[s.dataset.map]=s.value; });
+  const regionAll = $("#imp-region").value, auto = $("#imp-auto").checked;
+  const feats = fc.features.filter(f=>/Polygon|Point/.test(f.geometry.type) && f.geometry.type!=="MultiPoint");
+  const prog=$("#imp-prog"); prog.innerHTML=`<progress max="${feats.length}" value="0"></progress>`; const bar=prog.querySelector("progress");
+  let n=0; const used = new Set(Object.values(mapping)); let batch=[];
+  const flush = async()=>{ if(!batch.length) return; const rows = chk(await sb.from("lakes").insert(batch).select()); rows.forEach(setLake); n+=rows.length; bar.value=n; batch=[]; };
+  try{
+  for(const f of feats){
+    const p=f.properties||{}, d={}, m={...mapping};
+    for(const fd of F){ if(m[fd[0]]===undefined && p[fd[0]]!==undefined) m[fd[0]]=fd[0]; }
+    for(const [k,src] of Object.entries(m)){ let v=p[src]; if(v===undefined||v===null||v==="") continue; const fd=F.find(x=>x[0]===k); if(fd[3]==="num"){ v=+String(v).replace(",","."); if(!isFinite(v)) continue; } else v=String(v); d[k]=v; }
+    if(!d.region && regionAll) d.region=regionAll;
+    const skipKeys = new Set([...used, ...F.map(x=>x[0]), "id","updatedAt","updated_at"]);
+    const attrs={}; for(const [k,v] of Object.entries(p)){ if(!skipKeys.has(k) && v!==null && v!=="" && typeof v!=="object") attrs[k]=String(v).slice(0,300); }
+    if(Object.keys(attrs).length) d.attrs=attrs;
+    if(/Polygon/.test(f.geometry.type)){ const c=turf.centroid(f).geometry.coordinates; if(d.lat===undefined){ d.lat=+c[1].toFixed(6); d.lon=+c[0].toFixed(6); } if(auto && (d.area===undefined)) d.area=+(turf.area(f)/1e6).toFixed(4); d.geojson=(await putGeom(null, f.geometry)).geometry; }
+    else { d.lat=+f.geometry.coordinates[1].toFixed(6); d.lon=+f.geometry.coordinates[0].toFixed(6); }
+    if(!d.name) d.name = `${t("newName")} ${n+batch.length+1}`;
+    batch.push(clean(d));
+    if(batch.length>=25) await flush();
+  }
+  await flush();
+  }catch(err){ failMsg(err); }
+  renderList(); renderLayer();
+  closeModal(); toast(`${t("impDone")}: ${n}`, 4000); setTimeout(fitAll, 400);
+}
+
+/* ---------- export ---------- */
+function save(filename, data, type){
+  const blob = new Blob([data], {type: type || (/\.html$/.test(filename)?"text/html":/\.csv$/.test(filename)?"text/csv":"application/geo+json")+";charset=utf-8"});
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+}
+function printPassport(l){
+  const w = window.open("", "_blank"); if(!w){ save(`passport_${slug(l.name)}.html`, passportHTML(l)); return; }
+  w.document.open(); w.document.write(passportHTML(l).replace("</body>","<script>setTimeout(()=>print(),400)<\/script></body>")); w.document.close();
+}
+async function ensureGeom(id){ const g=geoms.get(id); return g ? g.geometry : null; }
+function props(l){ const o={id:l.id}; for(const f of F){ if(l[f[0]]!==undefined && l[f[0]]!=="") o[f[0]]=l[f[0]]; } o.updated_at=l.updated_at||""; o.updated_by=l.updated_by_email||""; return o; }
+const slug = s => String(s||"lake").normalize("NFKD").replace(/[^\w\-]+/g,"_").replace(/_+/g,"_").slice(0,40);
+const csvCell = v => { v = v===undefined||v===null ? "" : String(v); return /[",;\n]/.test(v) ? `"${v.replace(/"/g,'""')}"` : v; };
+async function doExport(kind, l){
+  const today = new Date().toISOString().slice(0,10);
+  if(kind==="geo"){ const g=await ensureGeom(l.id); const geometry = g || (l.lat!=null&&l.lat!==""?{type:"Point",coordinates:[+l.lon,+l.lat]}:null);
+    return save(`${slug(l.name)}_${today}.geojson`, JSON.stringify({type:"FeatureCollection",features:[{type:"Feature",properties:props(l),geometry}]},null,1)); }
+  if(kind==="obs"){ const head=["date",...OBS.map(o=>o[0]),"source","note"]; return save(`${slug(l.name)}_obs_${today}.csv`, "﻿"+[head.join(","),...obsRows.map(r=>head.map(k=>csvCell(r[k])).join(","))].join("\n")); }
+  if(kind==="csv"){ const head=["id",...F.map(f=>f[0]),"updated_at","updated_by_email"]; return save(`lakes_passports_${today}.csv`, "﻿"+[head.join(","),...[...lakes.values()].map(x=>head.map(k=>csvCell(k==="id"?x.id:x[k])).join(","))].join("\n")); }
+  if(kind==="geoall"){ const feats=[]; for(const x of lakes.values()){ const g=await ensureGeom(x.id); const geometry=g||(x.lat!=null&&x.lat!==""?{type:"Point",coordinates:[+x.lon,+x.lat]}:null); feats.push({type:"Feature",properties:props(x),geometry}); }
+    return save(`lakes_${today}.geojson`, JSON.stringify({type:"FeatureCollection",features:feats})); }
+  if(kind==="print"){ return printPassport(l); }
+  if(kind==="html"){ return save(`passport_${slug(l.name)}_${today}.html`, passportHTML(l)); }
+}
+function passportHTML(l){
+  const m = morphCalc(l.id);
+  const rows = g => F.filter(f=>f[4]===g).map(f=>{ const v=fieldValue(f,l[f[0]]); return `<tr><th>${esc(lang==='ru'?f[1]:f[2])}</th><td>${v===null?"—":v.replace(/<span class="chip [a-z]+">|<\/span>/g,"")}</td></tr>`; }).join("");
+  const svg = (()=>{ const g=geoms.get(l.id); if(!g||!g.geometry) return ""; const bb=turf.bbox({type:"Feature",geometry:g.geometry}); const k=Math.cos((bb[1]+bb[3])/2*Math.PI/180); const w=(bb[2]-bb[0])*k||1e-6, h=(bb[3]-bb[1])||1e-6, S=300/Math.max(w,h);
+    const ring=r=>r.map((c,i)=>`${i?"L":"M"}${((c[0]-bb[0])*k*S+10).toFixed(1)},${((bb[3]-c[1])*S+10).toFixed(1)}`).join("")+"Z";
+    const polys = g.geometry.type==="Polygon"?[g.geometry.coordinates]:g.geometry.coordinates; const d=polys.map(p=>p.map(ring).join("")).join("");
+    return `<svg viewBox="0 0 ${(w*S+20).toFixed(0)} ${(h*S+20).toFixed(0)}" width="${(w*S+20).toFixed(0)}" style="max-width:100%"><path d="${d}" fill="#bcd9e4" stroke="#1b6f8f" stroke-width="1.2" fill-rule="evenodd"/></svg>`; })();
+  const obsT = obsRows.length ? `<h2>${esc(t("tObs"))}</h2><table class="o"><tr><th>${esc(t("date"))}</th>${OBS.map(o=>`<th>${esc(t(o[1]))}</th>`).join("")}<th>${esc(t("source"))}</th></tr>${obsRows.map(r=>`<tr><td>${esc(r.date)}</td>${OBS.map(o=>`<td>${r[o[0]]??""}</td>`).join("")}<td>${esc(r.source||"")}</td></tr>`).join("")}</table>` : "";
+  return `<!DOCTYPE html><html lang="${lang}"><head><meta charset="utf-8"><title>${esc(t("tPass"))}: ${esc(l.name)}</title><style>
+  body{font:13px/1.45 "Noto Sans",Arial,sans-serif;color:#18252a;max-width:820px;margin:24px auto;padding:0 20px}
+  h1{font:700 24px "Noto Serif",Georgia,serif;margin:0 0 2px} .sub{color:#5b6b70;margin-bottom:16px} h2{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#0b6e79;border-bottom:1px solid #d5dddc;padding-bottom:3px;margin:18px 0 6px}
+  table{border-collapse:collapse;width:100%} th,td{text-align:left;padding:3px 6px;vertical-align:top;border-bottom:1px solid #eef1f0} th{width:42%;color:#5b6b70;font-weight:500}
+  table.o th,table.o td{width:auto;font-size:11.5px;text-align:right} table.o th:first-child,table.o td:first-child{text-align:left}
+  .grid{display:grid;grid-template-columns:1fr 320px;gap:20px;align-items:start} footer{margin-top:24px;color:#8a9a9e;font-size:11px}
+  @media print{body{margin:0}} @media (max-width:700px){.grid{grid-template-columns:1fr}}</style></head><body>
+  <div class="sub">${esc(t("subtitle"))}</div><h1>${esc(t("tPass"))}: ${esc(l.name||"")}</h1><div class="sub">${esc([l.name_ru,l.code&&("№ "+l.code),l.region,l.district].filter(Boolean).join(" · "))}</div>
+  <div class="grid"><div><h2>${esc(t("gId"))}</h2><table>${rows("id")}</table><h2>${esc(t("gLoc"))}</h2><table>${rows("loc")}</table></div><div>${svg}${m?`<table><tr><th>${esc(t("mArea"))}</th><td>${num(m.A,4)} ${t("km2")}</td></tr><tr><th>${esc(t("mPer"))}</th><td>${num(m.P,3)} ${t("km")}</td></tr><tr><th>Ks</th><td>${num(m.Ks,3)}</td></tr></table>`:""}</div></div>
+  <h2>${esc(t("gMorph"))}</h2><table>${rows("morph")}</table><h2>${esc(t("gHydro"))}</h2><table>${rows("hydro")}</table><h2>${esc(t("gEco"))}</h2><table>${rows("eco")}</table><h2>${esc(t("gSrc"))}</h2><table>${rows("src")}</table>${obsT}
+  <footer>${esc(t("title"))} · ${new Date().toLocaleDateString(lang==='ru'?'ru-RU':'az-Latn-AZ')} · ID ${esc(l.id)}</footer></body></html>`;
+}
+$("#btn-export").onclick = ()=>{ openModal(`<h3>${esc(t("expAll"))}</h3><div class="actions"><button class="btn" data-x="csv">${esc(t("expCsv"))}</button><button class="btn" data-x="geoall">${esc(t("expGeoAll"))}</button><button class="btn" data-close>${esc(t("close"))}</button></div>`); $("#mbox").querySelectorAll("[data-x]").forEach(b=>b.onclick=()=>{ const k=b.dataset.x; closeModal(); doExport(k); }); };
+
+/* ---------- language ---------- */
+function applyLang(){
+  document.documentElement.lang = lang==='ru'?'ru':'az';
+  document.title = t("title");
+  document.querySelectorAll("[data-i18n]").forEach(e=>e.textContent=t(e.dataset.i18n));
+  document.querySelectorAll("[data-i18n-ph]").forEach(e=>e.placeholder=t(e.dataset.i18nPh));
+  $("#lang-ru").setAttribute("aria-pressed",String(lang==='ru')); $("#lang-az").setAttribute("aria-pressed",String(lang==='az'));
+  fillSelects(); drawBase(); setDb(dbState); renderList(); if(selId) renderDrawer();
+}
+$("#lang-ru").onclick=()=>{ lang='ru'; ls.set('lakes-lang','ru'); applyLang(); };
+$("#lang-az").onclick=()=>{ lang='az'; ls.set('lakes-lang','az'); applyLang(); };
+
+/* ---------- data wiring ---------- */
+let dbState = "load", firstFit = true;
+const SEL = ["id",...COLS,"created_at","created_by_email","updated_at","updated_by_email"].join(",");
+function setDb(s){ dbState=s; const dot=$("#dbdot"); dot.className="dot"+(s==="on"?" on":s==="off"?" off":"");
+  $("#dbstat").textContent = s==="on" ? `${me?me.email:""} · ${t("role_"+myRole)}` : s==="off"?t("dbOffline"):t("dbLoad"); }
+function setLake(row){ lakes.set(row.id, {...row, hasGeom:!!row.geojson}); if(row.geojson) geoms.set(row.id,{geometry:row.geojson}); else geoms.delete(row.id); }
+async function loadLakes(){
+  setDb("load");
+  try{
+    let all=[], from=0; const page=500;
+    while(true){ const rows = chk(await sb.from("lakes").select(SEL).order("name").range(from, from+page-1)); all=all.concat(rows); if(rows.length<page) break; from+=page; }
+    lakes.clear(); geoms.clear(); all.forEach(setLake);
+    setDb("on"); renderList(); renderLayer(); if(selId && !editing) renderDrawer();
+    if(firstFit){ firstFit=false; const h=location.hash.match(/^#lake-(.+)$/); if(h && lakes.has(h[1])) select(h[1],true); else if(lakes.size) fitAll(); }
+  }catch(err){ setDb("off"); failMsg(err); }
+}
+async function loadMembers(){ try{ members = chk(await sb.from("lab_members").select("*").order("email")); }catch(e){ members=[]; } }
+let rt = null, rtTimer = null;
+function startRealtime(){
+  if(rt) sb.removeChannel(rt);
+  rt = sb.channel("lakes-rt")
+    .on("postgres_changes",{event:"*",schema:"public",table:"lakes"}, p=>{
+      if(p.eventType==="DELETE"){ lakes.delete(p.old.id); geoms.delete(p.old.id); if(selId===p.old.id) select(null); }
+      else { const r={...p.new}; delete r.geom; delete r.pt; setLake(r); }
+      clearTimeout(rtTimer); rtTimer=setTimeout(()=>{ renderList(); renderLayer(); if(selId && !editing) renderDrawer(); }, 300);
+    })
+    .on("postgres_changes",{event:"*",schema:"public",table:"lake_obs"}, p=>{ if(selId && (p.new?.lake_id===selId || p.eventType==="DELETE")) loadObs(selId); })
+    .on("postgres_changes",{event:"*",schema:"public",table:"lake_photos"}, p=>{ if(selId && (p.new?.lake_id===selId || p.eventType==="DELETE")) loadPhotos(selId); })
+    .subscribe();
+}
+window.addEventListener("hashchange", ()=>{ const h=location.hash.match(/^#lake-(.+)$/); if(h && h[1]!==selId && lakes.has(h[1])) select(h[1],true); });
+
+/* ---------- auth screens ---------- */
+function gate(html){ const g=$("#gate"); g.innerHTML=`<div class="gbox"><h2>${esc(t("title"))}</h2><p class="note">${esc(t("subtitle"))}</p>${html}</div>`; g.classList.add("open"); return g; }
+function closeGate(){ $("#gate").classList.remove("open"); $("#gate").innerHTML=""; }
+function showSetup(){
+  const g = gate(`<p>${esc(t("setupTxt"))}</p><form id="sf" class="gform">
+    <label for="sf-url">Project URL<input type="text" id="sf-url" required placeholder="https://xxxx.supabase.co"></label>
+    <label for="sf-key">anon public key<textarea id="sf-key" required rows="3"></textarea></label>
+    <button class="btn pri" type="submit">${esc(t("connect"))}</button></form>`);
+  $("#sf").onsubmit=e=>{ e.preventDefault(); ls.set("lakes-sb-url",$("#sf-url").value.trim()); ls.set("lakes-sb-key",$("#sf-key").value.trim()); location.reload(); };
+}
+function showLogin(mode="in", msg=""){
+  const g = gate(`${msg?`<div class="warnbox">${esc(msg)}</div>`:""}<form id="lf" class="gform">
+    <label for="lf-email">E-mail<input type="email" id="lf-email" autocomplete="username" required></label>
+    ${mode!=="reset"?`<label for="lf-pass">${esc(t("password"))}<input type="password" id="lf-pass" autocomplete="${mode==="up"?"new-password":"current-password"}" minlength="8" required></label>`:""}
+    <button class="btn pri" type="submit">${esc(t(mode==="up"?"signUp":mode==="reset"?"sendReset":"signIn"))}</button>
+    <div class="glinks">${mode!=="in"?`<button type="button" class="btn ghost sm" data-m="in">${esc(t("haveAcc"))}</button>`:""}${mode!=="up"?`<button type="button" class="btn ghost sm" data-m="up">${esc(t("firstTime"))}</button>`:""}${mode!=="reset"?`<button type="button" class="btn ghost sm" data-m="reset">${esc(t("forgot"))}</button>`:""}</div>
+    ${mode==="up"?`<p class="note">${esc(t("signUpNote"))}</p>`:""}</form>`);
+  g.querySelectorAll("[data-m]").forEach(b=>b.onclick=()=>showLogin(b.dataset.m));
+  $("#lf").onsubmit=async e=>{ e.preventDefault(); const email=$("#lf-email").value.trim().toLowerCase(), pass=$("#lf-pass")?.value; const btn=e.target.querySelector("button[type=submit]"); btn.disabled=true;
+    try{
+      if(mode==="in"){ chk(await sb.auth.signInWithPassword({email, password:pass})); }
+      else if(mode==="up"){ const r=chk(await sb.auth.signUp({email, password:pass, options:{emailRedirectTo: location.origin+location.pathname}})); if(!r.session) showLogin("in", t("checkMail")); }
+      else { chk(await sb.auth.resetPasswordForEmail(email, {redirectTo: location.origin+location.pathname})); showLogin("in", t("resetSent")); }
+    }catch(err){ btn.disabled=false; const m=err.message||String(err); showLogin(mode, /Invalid login/i.test(m)?t("badLogin"):/not confirmed/i.test(m)?t("notConfirmed"):m); }
+  };
+}
+function showSetPassword(){
+  const g = gate(`<p>${esc(t("newPassTxt"))}</p><form id="pf2" class="gform"><label for="np">${esc(t("newPass"))}<input type="password" id="np" minlength="8" autocomplete="new-password" required></label><button class="btn pri" type="submit">${esc(t("save"))}</button></form>`);
+  $("#pf2").onsubmit=async e=>{ e.preventDefault(); try{ chk(await sb.auth.updateUser({password:$("#np").value})); toast(t("saved")); history.replaceState(null,"",location.pathname); closeGate(); afterLogin(); }catch(err){ toast(err.message,5000); } };
+}
+function showNoAccess(){
+  const g = gate(`<div class="warnbox">${esc(t("noAccess").replace("{e}", me.email))}</div><div class="actions"><button class="btn" id="na-out">${esc(t("signOut"))}</button></div>`);
+  $("#na-out").onclick=()=>sb.auth.signOut();
+}
+let afterP = null;
+function afterLogin(){ return afterP || (afterP = doAfterLogin().catch(e=>{ afterP=null; failMsg(e); })); }
+async function doAfterLogin(){
+  const { data:{ user:u } } = await sb.auth.getUser(); if(!u){ showLogin(); return; }
+  me = u;
+  const r = await sb.from("lab_members").select("role").eq("email", (u.email||"").toLowerCase()).maybeSingle();
+  myRole = r.data && r.data.role;
+  if(!myRole){ afterP=null; showNoAccess(); return; }
+  canWrite = myRole==="admin" || myRole==="editor"; isAdmin = myRole==="admin";
+  closeGate(); $("#userbox").hidden=false; $("#btn-members").hidden=!isAdmin;
+  await loadMembers(); await loadLakes(); startRealtime();
+}
+
+/* ---------- user menu: members, password, sign out ---------- */
+$("#btn-out").onclick = async()=>{ await sb.auth.signOut(); location.hash=""; location.reload(); };
+$("#btn-pass").onclick = ()=>{ openModal(`<h3>${esc(t("changePass"))}</h3><form id="cpf" class="form"><label class="full" for="cp-n">${esc(t("newPass"))}<input type="password" id="cp-n" minlength="8" autocomplete="new-password" required></label><div class="actions full" style="grid-column:1/-1"><button class="btn pri" type="submit">${esc(t("save"))}</button><button class="btn" type="button" data-close>${esc(t("cancel"))}</button></div></form>`);
+  $("#cpf").onsubmit=async e=>{ e.preventDefault(); try{ chk(await sb.auth.updateUser({password:$("#cp-n").value})); closeModal(); toast(t("saved")); }catch(err){ toast(err.message,5000); } }; };
+$("#btn-members").onclick = ()=>renderMembers();
+async function renderMembers(){
+  await loadMembers();
+  const roles=["admin","editor","viewer"];
+  openModal(`<h3>${esc(t("members"))}</h3><p class="note">${esc(t("membersNote"))}</p>
+    <div class="tw"><table class="t"><thead><tr><th>E-mail</th><th style="text-align:left">${esc(t("fullName"))}</th><th style="text-align:left">${esc(t("role"))}</th><th></th></tr></thead><tbody>
+    ${members.map(m=>`<tr><td>${esc(m.email)}</td><td style="text-align:left">${esc(m.full_name||"")}</td><td style="text-align:left"><select data-role="${esc(m.email)}" ${m.email===me.email?"disabled":""}>${roles.map(r=>`<option value="${r}"${r===m.role?" selected":""}>${esc(t("role_"+r))}</option>`).join("")}</select></td><td>${m.email===me.email?"":`<button class="btn ghost sm" data-rm="${esc(m.email)}" aria-label="delete">✕</button>`}</td></tr>`).join("")}
+    </tbody></table></div>
+    <form id="mf" class="form" style="margin-top:12px"><label for="mf-e">E-mail<input type="email" id="mf-e" required></label><label for="mf-n">${esc(t("fullName"))}<input type="text" id="mf-n"></label>
+    <label for="mf-r">${esc(t("role"))}<select id="mf-r">${roles.map(r=>`<option value="${r}"${r==="editor"?" selected":""}>${esc(t("role_"+r))}</option>`).join("")}</select></label>
+    <div class="actions" style="align-self:end;margin:0"><button class="btn pri" type="submit">${esc(t("addMember"))}</button></div></form>
+    <div class="actions"><button class="btn" data-close>${esc(t("close"))}</button></div>`);
+  $("#mf").onsubmit=async e=>{ e.preventDefault(); try{ chk(await sb.from("lab_members").upsert({email:$("#mf-e").value.trim().toLowerCase(), full_name:$("#mf-n").value.trim()||null, role:$("#mf-r").value})); renderMembers(); toast(t("saved")); }catch(err){ failMsg(err); } };
+  $("#mbox").querySelectorAll("[data-role]").forEach(s=>s.onchange=async()=>{ try{ chk(await sb.from("lab_members").update({role:s.value}).eq("email", s.dataset.role)); toast(t("saved")); }catch(err){ failMsg(err); } });
+  $("#mbox").querySelectorAll("[data-rm]").forEach(b=>b.onclick=async()=>{ try{ chk(await sb.from("lab_members").delete().eq("email", b.dataset.rm)); renderMembers(); }catch(err){ failMsg(err); } });
+}
+
+/* ---------- start ---------- */
+fillSelects(); applyLang(); setDb("load");
+(async()=>{
+  const c = cfg();
+  if(!c.url || !c.key){ showSetup(); return; }
+  const recovering = /type=(recovery|invite)/.test(location.hash);
+  try{ sb = supabase.createClient(c.url, c.key); }catch(err){ showSetup(); toast(err.message,6000); return; }
+  sb.auth.onAuthStateChange((ev, session)=>{
+    if(ev==="PASSWORD_RECOVERY"){ showSetPassword(); return; }
+    if(ev==="SIGNED_OUT"){ afterP=null; me=null; $("#userbox").hidden=true; showLogin(); return; }
+    if(ev==="SIGNED_IN" && !recovering) setTimeout(afterLogin, 0);
+  });
+  const { data:{ session } } = await sb.auth.getSession();
+  if(recovering && session){ showSetPassword(); return; }
+  if(session) afterLogin(); else showLogin();
+})();
+</script>
+</body>
+</html>
